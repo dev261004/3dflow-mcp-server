@@ -1,12 +1,20 @@
-import { generateR3FCode } from "./r3fGenerator.js";
+import { generateR3FCode, R3FTypingMode } from "./r3fGenerator.js";
+import { SceneData } from "../types/scene.js";
 
-export function exportScene(scene: any, format: string) {
+interface ExportSceneOptions {
+  typing?: R3FTypingMode;
+}
+
+export function exportScene(scene: SceneData, format: string, options: ExportSceneOptions = {}) {
   // 🟢 R3F EXPORT
   if (format === "r3f") {
-    const code = generateR3FCode(scene);
+    const code = generateR3FCode(scene, {
+      typing: options.typing ?? "none"
+    });
 
     return {
       type: "r3f",
+      language: options.typing === "typescript" ? "tsx" : "jsx",
       content: code
     };
   }

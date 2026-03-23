@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { exportScene } from "../services/exportService.js";
+import { SceneData } from "../types/scene.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
 export const exportAssetTool = {
@@ -18,16 +19,20 @@ Supported formats:
 Rules:
 - Do NOT modify scene
 - Only convert and package output
+- For R3F exports, hooks must remain valid and assets need safe fallbacks
 `,
 
   parameters: z.object({
     scene_data: z.any(),
-    format: z.enum(["r3f", "json", "preview"])
+    format: z.enum(["r3f", "json", "preview"]),
+    typing: z.enum(["none", "typescript", "prop-types"]).optional()
   }),
 
-  async execute({ scene_data, format }: any) {
-    const normalizedScene = unwrapToolPayload(scene_data, "scene_data");
-    const result = exportScene(normalizedScene, format);
+  async execute({ scene_data, format, typing }: any) {
+    const normalizedScene = unwrapToolPayload<SceneData>(scene_data, "scene_data");
+    const result = exportScene(normalizedScene, format, {
+      typing: typing || "none"
+    });
 
     return createToolResult(result);
   }

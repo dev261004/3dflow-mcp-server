@@ -52,6 +52,7 @@ This tool is deterministic and does not interpret intent.
         const objects = Array.isArray(normalizedPlan.objects)
             ? [...new Set(normalizedPlan.objects.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean))]
             : [];
+        const rawStyle = typeof normalizedPlan.style === "string" ? normalizedPlan.style.trim() : undefined;
         const designTokens = normalizeDesignTokens(normalizedPlan.design_tokens, {
             use_case: normalizedPlan.use_case,
             style: normalizedPlan.style,
@@ -67,7 +68,7 @@ This tool is deterministic and does not interpret intent.
         const scene = buildScene({
             ...normalizedPlan,
             objects,
-            style: designTokens.theme,
+            style: rawStyle || designTokens.theme,
             use_case: designTokens.use_case,
             animation: designTokens.animation,
             design_tokens: designTokens

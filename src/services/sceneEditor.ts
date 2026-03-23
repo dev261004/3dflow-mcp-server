@@ -1,8 +1,27 @@
+import type { ThemeToken } from "../types/designTokens.js";
+import { buildAnimations } from "./animationEngine.js";
+import { getMaterial } from "./materialService.js";
+
+function getSceneTheme(scene: any): ThemeToken {
+  const tokenTheme = scene?.metadata?.design_tokens?.theme;
+
+  if (tokenTheme === "premium" || tokenTheme === "minimal" || tokenTheme === "futuristic" || tokenTheme === "playful" || tokenTheme === "dark") {
+    return tokenTheme;
+  }
+
+  if (scene?.metadata?.style === "dark") {
+    return "dark";
+  }
+
+  return "minimal";
+}
+
 export function editScene(scene: any, prompt: string) {
   const lower = prompt.toLowerCase();
 
   // 🧠 CLONE (avoid mutation issues)
   const updated = JSON.parse(JSON.stringify(scene));
+  const theme = getSceneTheme(updated);
 
   // 🎨 BACKGROUND / STYLE
   if (lower.includes("dark")) {
@@ -17,50 +36,44 @@ export function editScene(scene: any, prompt: string) {
 
   // 💎 MATERIAL CHANGES
   if (lower.includes("metal")) {
-    updated.objects.forEach((obj: any) => {
-      obj.material = {
-        type: "metal",
-        color: "#dddddd",
-        metalness: 0.8,
-        roughness: 0.2
-      };
+    updated.objects.forEach((obj: any, index: number) => {
+      obj.material = getMaterial(theme, "metal_chrome", obj.name || "", index, "chrome");
     });
   }
 
   if (lower.includes("glass")) {
-    updated.objects.forEach((obj: any) => {
-      obj.material = {
-        type: "glass",
-        color: "#ffffff",
-        roughness: 0.1
-      };
+    updated.objects.forEach((obj: any, index: number) => {
+      obj.material = getMaterial(theme, "glass_frost", obj.name || "", index, "glassmorphism");
+    });
+  }
+
+  if (lower.includes("clay")) {
+    updated.objects.forEach((obj: any, index: number) => {
+      obj.material = getMaterial(theme, "matte_soft", obj.name || "", index, "clay");
+    });
+  }
+
+  if (lower.includes("neon")) {
+    updated.objects.forEach((obj: any, index: number) => {
+      obj.material = getMaterial("futuristic", "plastic_gloss", obj.name || "", index, "neon");
     });
   }
 
   // 🎞️ ANIMATION
   if (lower.includes("rotate")) {
-    updated.animations = [
-      {
-        id: crypto.randomUUID(),
-        target: updated.objects[0].id,
-        type: "rotation",
-        axis: "y",
-        speed: 0.5,
-        loop: true
-      }
-    ];
+    updated.animations = buildAnimations(updated.objects, "rotate");
   }
 
   if (lower.includes("float")) {
-    updated.animations = [
-      {
-        id: crypto.randomUUID(),
-        target: updated.objects[0].id,
-        type: "float",
-        speed: 0.3,
-        loop: true
-      }
-    ];
+    updated.animations = buildAnimations(updated.objects, "float");
+  }
+
+  if (lower.includes("pulse")) {
+    updated.animations = buildAnimations(updated.objects, "pulse");
+  }
+
+  if (lower.includes("bounce")) {
+    updated.animations = buildAnimations(updated.objects, "bounce");
   }
 
   // 📍 POSITION CHANGES

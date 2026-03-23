@@ -17,6 +17,10 @@ Supported platforms:
 - nextjs
 - html (basic usage)
 
+Next.js router modes:
+- app_router
+- pages_router
+
 Rules:
 - Keep instructions simple and practical
 - Focus on helping user run the scene quickly
@@ -24,11 +28,12 @@ Rules:
 
   parameters: z.object({
     platform: z.enum(["react", "nextjs", "html"]),
-    format: z.enum(["r3f", "json"]).optional()
+    format: z.enum(["r3f", "json"]).optional(),
+    router: z.enum(["app_router", "pages_router"]).optional()
   }),
 
-  async execute({ platform, format }: any) {
-    const help = getIntegrationHelp(platform, format || "r3f");
+  async execute({ platform, format, router }: any) {
+    const help = getIntegrationHelp(platform, format || "r3f", router);
 
     return createToolResult({
       integration_guide: help

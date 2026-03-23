@@ -112,6 +112,10 @@ const ANIMATION_RULES: MatchRule<AnimationToken>[] = [
     keywords: ["rotating", "rotation", "rotate", "spinning", "spin", "turntable"]
   },
   {
+    token: "pulse",
+    keywords: ["pulse", "pulsing", "breathing", "heartbeat"]
+  },
+  {
     token: "bounce",
     keywords: ["bounce", "bouncy", "spring", "springy", "bob"]
   }

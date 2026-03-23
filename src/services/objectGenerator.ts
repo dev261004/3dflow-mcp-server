@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
-import { getAssetForObject } from "./assetService.js";
+import { resolveAssetForObject } from "./assetService.js";
 import { getMaterial } from "./materialService.js";
-import { SceneObject, Vector3 } from "../types/scene.js";
+import { Material, SceneObject, Vector3 } from "../types/scene.js";
 import {
   CompositionPresetToken,
   MaterialPresetToken,
@@ -26,11 +26,21 @@ const LAYOUT_POSITIONS: Record<CompositionPresetToken, Vector3[]> = {
   ]
 };
 
-function getPrimitiveShape(name: string): "box" | "cylinder" {
+const DEFAULT_SEGMENT_COUNT: Record<"box" | "sphere" | "cylinder", number> = {
+  box: 1,
+  sphere: 64,
+  cylinder: 48
+};
+
+function getPrimitiveShape(name: string): "box" | "sphere" | "cylinder" {
   const normalizedName = name.toLowerCase();
 
   if (normalizedName.includes("can") || normalizedName.includes("bottle")) {
     return "cylinder";
+  }
+
+  if (normalizedName.includes("orb") || normalizedName.includes("sphere") || normalizedName.includes("globe")) {
+    return "sphere";
   }
 
   if (normalizedName.includes("ice")) {
@@ -61,20 +71,38 @@ export function createObject(
   theme: ThemeToken,
   materialPreset: MaterialPresetToken,
   composition: CompositionPresetToken,
-  index: number
+  index: number,
+  rawStyle?: string
 ): SceneObject {
-  const asset = getAssetForObject(name);
-  const shape = asset ? undefined : getPrimitiveShape(name);
+  const { asset, confirmed } = resolveAssetForObject(name);
+  const shape = getPrimitiveShape(name);
+  const material = getMaterial(theme, materialPreset, name, index, rawStyle);
 
   return {
     id: uuidv4(),
     type: asset ? "model" : "primitive",
     name,
-    shape,
+    shape: asset && confirmed ? undefined : shape,
     asset: asset || null,
+    asset_confirmed: asset ? confirmed : undefined,
     position: getObjectPosition(index, composition),
     rotation: [0, 0, 0],
     scale: getObjectScale(index, composition),
-    material: getMaterial(theme, materialPreset, name)
+    material,
+    render_hints: createRenderHints(asset && confirmed ? undefined : shape, asset, material)
+  };
+}
+
+function createRenderHints(
+  shape: SceneObject["shape"],
+  asset: string | null,
+  material: Material
+): SceneObject["render_hints"] {
+  return {
+    segment_count: shape ? DEFAULT_SEGMENT_COUNT[shape] : undefined,
+    texture_resolution: asset ? "high" : undefined,
+    transparency_mode: typeof material.transmission === "number" && material.transmission > 0
+      ? "physical"
+      : "opaque"
   };
 }

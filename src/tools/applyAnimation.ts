@@ -16,14 +16,16 @@ Rules:
 - Replace existing animation if present
 
 Supported animations:
+- rotate
 - rotation
 - float
+- pulse
 - bounce
 `,
 
   parameters: z.object({
     scene_data: z.any(),
-    animation_type: z.enum(["rotation", "float", "bounce"])
+    animation_type: z.enum(["rotate", "rotation", "float", "pulse", "bounce"])
   }),
 
   async execute({ scene_data, animation_type }: any) {

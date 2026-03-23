@@ -1,81 +1,233 @@
 import { Material } from "../types/scene.js";
 import { MaterialPresetToken, ThemeToken } from "../types/designTokens.js";
 
-function getThemeColor(theme: ThemeToken) {
-  switch (theme) {
-    case "premium":
-      return "#ddd3c3";
-    case "futuristic":
-      return "#cfe8ff";
-    case "playful":
-      return "#ff8aa1";
-    case "dark":
-      return "#2f3440";
-    case "minimal":
+export type MaterialStyleToken =
+  | "glassmorphism"
+  | "matte_dark"
+  | "neon"
+  | "clay"
+  | "chrome"
+  | "frosted";
+
+interface MaterialPalette {
+  primary: string;
+  secondary: string;
+  accent: string;
+  neutral: string;
+  dark: string;
+}
+
+const THEME_PALETTES: Record<ThemeToken, MaterialPalette> = {
+  minimal: {
+    primary: "#f3efe8",
+    secondary: "#dfd4c3",
+    accent: "#8ca4ff",
+    neutral: "#ffffff",
+    dark: "#20232b"
+  },
+  premium: {
+    primary: "#d9c1a3",
+    secondary: "#f2e6d6",
+    accent: "#c6924c",
+    neutral: "#fdf8f1",
+    dark: "#221a14"
+  },
+  futuristic: {
+    primary: "#b7d1ff",
+    secondary: "#e4f1ff",
+    accent: "#49d7ff",
+    neutral: "#e8fbff",
+    dark: "#0b1120"
+  },
+  playful: {
+    primary: "#ffb380",
+    secondary: "#ffe08a",
+    accent: "#ff5cc8",
+    neutral: "#fff6f2",
+    dark: "#2a2134"
+  },
+  dark: {
+    primary: "#2f3440",
+    secondary: "#454d60",
+    accent: "#7c86ff",
+    neutral: "#d8def0",
+    dark: "#0d0d14"
+  }
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function hexToRgb(hex: string) {
+  const normalized = hex.replace("#", "");
+  const value = normalized.length === 3
+    ? normalized.split("").map((char) => char + char).join("")
+    : normalized;
+
+  return {
+    r: Number.parseInt(value.slice(0, 2), 16),
+    g: Number.parseInt(value.slice(2, 4), 16),
+    b: Number.parseInt(value.slice(4, 6), 16)
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  return `#${[r, g, b].map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function mixColors(base: string, target: string, amount: number) {
+  const left = hexToRgb(base);
+  const right = hexToRgb(target);
+  const ratio = clamp(amount, 0, 1);
+
+  return rgbToHex(
+    left.r + (right.r - left.r) * ratio,
+    left.g + (right.g - left.g) * ratio,
+    left.b + (right.b - left.b) * ratio
+  );
+}
+
+function normalizeStyleToken(value: string) {
+  return value.toLowerCase().trim().replace(/[\s-]+/g, "_");
+}
+
+function getVariantMix(objectIndex: number) {
+  if (objectIndex <= 0) {
+    return 0;
+  }
+
+  return clamp(0.18 * objectIndex, 0.18, 0.42);
+}
+
+export function resolveMaterialStyleToken(
+  theme: ThemeToken,
+  materialPreset: MaterialPresetToken,
+  rawStyle?: string
+): MaterialStyleToken {
+  const normalizedStyle = typeof rawStyle === "string" ? normalizeStyleToken(rawStyle) : "";
+
+  if (["glassmorphism", "glass", "glass_frost"].includes(normalizedStyle)) {
+    return "glassmorphism";
+  }
+
+  if (["frosted", "frosted_glass"].includes(normalizedStyle)) {
+    return "frosted";
+  }
+
+  if (["chrome", "metal", "metallic", "premium"].includes(normalizedStyle)) {
+    return "chrome";
+  }
+
+  if (["matte_dark", "dark_matte"].includes(normalizedStyle)) {
+    return "matte_dark";
+  }
+
+  if (["neon", "glow", "glowing", "futuristic"].includes(normalizedStyle)) {
+    return "neon";
+  }
+
+  if (["clay", "matte", "minimal"].includes(normalizedStyle)) {
+    return "clay";
+  }
+
+  switch (materialPreset) {
+    case "glass_frost":
+      return "glassmorphism";
+    case "glass_clear":
+      return "frosted";
+    case "metal_chrome":
+      return "chrome";
+    case "metal_brushed":
+      return theme === "dark" ? "matte_dark" : "chrome";
+    case "plastic_gloss":
+      return theme === "futuristic" ? "neon" : "clay";
+    case "matte_soft":
     default:
-      return "#f5f5f5";
+      switch (theme) {
+        case "dark":
+          return "matte_dark";
+        case "futuristic":
+          return "neon";
+        case "premium":
+          return "chrome";
+        case "minimal":
+        case "playful":
+        default:
+          return "clay";
+      }
   }
 }
 
 export function getMaterial(
   theme: ThemeToken,
   materialPreset: MaterialPresetToken,
-  name = ""
+  name = "",
+  objectIndex = 0,
+  rawStyle?: string
 ): Material {
   const normalizedName = name.toLowerCase();
+  const palette = THEME_PALETTES[theme];
+  const materialStyle = normalizedName.includes("ice")
+    ? "frosted"
+    : resolveMaterialStyleToken(theme, materialPreset, rawStyle);
+  const supportMix = getVariantMix(objectIndex);
+  const mainColor = objectIndex === 0;
 
-  if (normalizedName.includes("ice")) {
-    return {
-      type: "glass",
-      color: "#ffffff",
-      roughness: 0.1
-    };
-  }
-
-  switch (materialPreset) {
-    case "glass_frost":
+  switch (materialStyle) {
+    case "glassmorphism":
       return {
         type: "glass",
-        color: "#ffffff",
-        roughness: 0.08
+        color: mainColor ? palette.secondary : mixColors(palette.secondary, palette.neutral, supportMix + 0.12),
+        metalness: mainColor ? 0.12 : 0.05,
+        roughness: mainColor ? 0 : 0.08,
+        transmission: mainColor ? 0.85 : 0.72
       };
 
-    case "glass_clear":
-      return {
-        type: "glass",
-        color: "#f5fbff",
-        roughness: 0.02
-      };
-
-    case "metal_chrome":
-      return {
-        type: "metal",
-        color: "#f5f5f5",
-        metalness: 1,
-        roughness: 0.05
-      };
-
-    case "metal_brushed":
-      return {
-        type: "metal",
-        color: getThemeColor(theme),
-        metalness: 0.8,
-        roughness: 0.22
-      };
-
-    case "plastic_gloss":
+    case "matte_dark":
       return {
         type: "matte",
-        color: getThemeColor(theme),
-        roughness: 0.22
+        color: mainColor ? "#0d0d14" : mixColors("#0d0d14", palette.secondary, supportMix),
+        metalness: mainColor ? 0.6 : 0.36,
+        roughness: mainColor ? 0.15 : 0.28
       };
 
-    case "matte_soft":
+    case "neon":
+      return {
+        type: "standard",
+        color: mainColor ? mixColors(palette.dark, palette.secondary, 0.22) : mixColors(palette.secondary, palette.neutral, supportMix + 0.08),
+        metalness: mainColor ? 0.2 : 0.1,
+        roughness: mainColor ? 0.08 : 0.18,
+        emissive: palette.accent,
+        emissiveIntensity: mainColor ? 1.2 : 0.7
+      };
+
+    case "chrome":
+      return {
+        type: "metal",
+        color: mainColor ? "#f6f7fb" : mixColors("#f6f7fb", palette.secondary, supportMix),
+        metalness: 1,
+        roughness: mainColor ? 0.05 : 0.12,
+        envMapIntensity: mainColor ? 1.5 : 1
+      };
+
+    case "frosted":
+      return {
+        type: "glass",
+        color: mainColor ? "#ffffff" : mixColors("#ffffff", palette.secondary, supportMix * 0.6),
+        metalness: 0.04,
+        roughness: mainColor ? 0.3 : 0.42,
+        transmission: mainColor ? 0.6 : 0.5
+      };
+
+    case "clay":
     default:
       return {
         type: "matte",
-        color: getThemeColor(theme),
-        roughness: 0.8
+        color: mainColor ? palette.primary : mixColors(palette.primary, palette.neutral, supportMix),
+        metalness: 0,
+        roughness: 0.9,
+        flatShading: true
       };
   }
 }

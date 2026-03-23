@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { createObject } from "./objectGenerator.js";
-import { createAnimation } from "./animationEngine.js";
+import { buildAnimations } from "./animationEngine.js";
 import { Animation, Light, SceneData, SceneObject } from "../types/scene.js";
 import {
     BackgroundPresetToken,
@@ -127,9 +127,9 @@ export function buildScene(plan: any): SceneData {
         style: plan?.style,
         animation: plan?.animation
     });
+    const rawStyle = typeof plan?.style === "string" ? plan.style : undefined;
 
     const objects: SceneObject[] = [];
-    const animations: Animation[] = [];
 
     // 🧠 Generate objects
     if (plan.objects && Array.isArray(plan.objects)) {
@@ -142,17 +142,11 @@ export function buildScene(plan: any): SceneData {
                 designTokens.theme,
                 designTokens.material_preset,
                 designTokens.composition,
-                index
+                index,
+                rawStyle
             );
 
             objects.push(obj);
-
-            // Add animation to main object
-            if (index === 0 && designTokens.animation !== "none") {
-                const anim = createAnimation(obj.id, designTokens.animation);
-
-                if (anim) animations.push(anim);
-            }
         });
     }
 
@@ -164,10 +158,14 @@ export function buildScene(plan: any): SceneData {
                 designTokens.theme,
                 designTokens.material_preset,
                 designTokens.composition,
-                0
+                0,
+                rawStyle
             )
         );
     }
+    const animations: Animation[] = buildAnimations(objects, designTokens.animation, {
+        accentPulse: designTokens.lighting_preset === "neon_edge" || rawStyle?.toLowerCase().includes("neon") === true
+    });
 
     return {
         scene_id: sceneId,
@@ -175,7 +173,7 @@ export function buildScene(plan: any): SceneData {
         metadata: {
             title: "Generated Scene",
             use_case: designTokens.use_case,
-            style: designTokens.theme,
+            style: rawStyle || designTokens.theme,
             design_tokens: designTokens,
             created_at: new Date().toISOString()
         },
