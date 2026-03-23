@@ -21,12 +21,14 @@ Return these structured fields when possible:
 - lighting_preset
 - background_preset
 - composition
+- confirmed_objects
 - object_hints
 
 Rules:
 - Do NOT generate objects here
 - Do NOT create a scene
 - Only clarify and structure intent
+- Keep richer scene-object detail in confirmed_objects for downstream tools
 
 Return a refined prompt and structured context for the next step.
 `,

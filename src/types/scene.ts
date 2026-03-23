@@ -32,6 +32,7 @@ export interface SceneObject {
   shape?: "box" | "sphere" | "cylinder";
   asset?: string | null;
   asset_confirmed?: boolean;
+  fallback_strategy?: "procedural";
   position: Vector3;
   rotation: Vector3;
   scale: Vector3;
@@ -72,6 +73,7 @@ export interface Animation {
 
 export interface SceneData {
   scene_id: string;
+  notes?: string[];
 
   metadata: {
     title: string;

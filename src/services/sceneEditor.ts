@@ -1,4 +1,4 @@
-import type { ThemeToken } from "../types/designTokens.js";
+import type { LightingPresetToken, ThemeToken } from "../types/designTokens.js";
 import { buildAnimations } from "./animationEngine.js";
 import { getMaterial } from "./materialService.js";
 
@@ -16,12 +16,28 @@ function getSceneTheme(scene: any): ThemeToken {
   return "minimal";
 }
 
+function getSceneLightingPreset(scene: any): LightingPresetToken {
+  const lightingPreset = scene?.metadata?.design_tokens?.lighting_preset;
+
+  if (
+    lightingPreset === "studio_soft" ||
+    lightingPreset === "studio_dramatic" ||
+    lightingPreset === "ambient_bright" ||
+    lightingPreset === "neon_edge"
+  ) {
+    return lightingPreset;
+  }
+
+  return scene?.metadata?.style === "dark" ? "studio_dramatic" : "studio_soft";
+}
+
 export function editScene(scene: any, prompt: string) {
   const lower = prompt.toLowerCase();
 
   // 🧠 CLONE (avoid mutation issues)
   const updated = JSON.parse(JSON.stringify(scene));
   const theme = getSceneTheme(updated);
+  const lightingPreset = getSceneLightingPreset(updated);
 
   // 🎨 BACKGROUND / STYLE
   if (lower.includes("dark")) {
@@ -37,25 +53,25 @@ export function editScene(scene: any, prompt: string) {
   // 💎 MATERIAL CHANGES
   if (lower.includes("metal")) {
     updated.objects.forEach((obj: any, index: number) => {
-      obj.material = getMaterial(theme, "metal_chrome", obj.name || "", index, "chrome");
+      obj.material = getMaterial(theme, "metal_chrome", lightingPreset, obj.name || "", index, "chrome");
     });
   }
 
   if (lower.includes("glass")) {
     updated.objects.forEach((obj: any, index: number) => {
-      obj.material = getMaterial(theme, "glass_frost", obj.name || "", index, "glassmorphism");
+      obj.material = getMaterial(theme, "glass_frost", lightingPreset, obj.name || "", index, "glassmorphism");
     });
   }
 
   if (lower.includes("clay")) {
     updated.objects.forEach((obj: any, index: number) => {
-      obj.material = getMaterial(theme, "matte_soft", obj.name || "", index, "clay");
+      obj.material = getMaterial(theme, "matte_soft", lightingPreset, obj.name || "", index, "clay");
     });
   }
 
   if (lower.includes("neon")) {
     updated.objects.forEach((obj: any, index: number) => {
-      obj.material = getMaterial("futuristic", "plastic_gloss", obj.name || "", index, "neon");
+      obj.material = getMaterial("futuristic", "plastic_gloss", "neon_edge", obj.name || "", index, "neon");
     });
   }
 

@@ -1,5 +1,5 @@
 import { Material } from "../types/scene.js";
-import { MaterialPresetToken, ThemeToken } from "../types/designTokens.js";
+import { LightingPresetToken, MaterialPresetToken, ThemeToken } from "../types/designTokens.js";
 
 export type MaterialStyleToken =
   | "glassmorphism"
@@ -100,36 +100,41 @@ function getVariantMix(objectIndex: number) {
   return clamp(0.18 * objectIndex, 0.18, 0.42);
 }
 
+function getAccentColor(theme: ThemeToken, lightingPreset: LightingPresetToken) {
+  if (lightingPreset === "neon_edge") {
+    return "#00e5ff";
+  }
+
+  return THEME_PALETTES[theme].accent;
+}
+
+function isAccentObject(name: string) {
+  return /(orb|ring|glow|halo)/i.test(name);
+}
+
+function getGlassBaseColor(theme: ThemeToken, lightingPreset: LightingPresetToken, objectIndex: number) {
+  const palette = THEME_PALETTES[theme];
+
+  if (lightingPreset === "neon_edge") {
+    const glassPrimary = theme === "premium" ? "#d9e8ff" : "#cde6ff";
+    const glassSupport = theme === "premium" ? "#eef6ff" : "#f3fbff";
+
+    return objectIndex === 0 ? glassPrimary : mixColors(glassSupport, "#ffffff", getVariantMix(objectIndex) * 0.45);
+  }
+
+  if (theme === "premium") {
+    return objectIndex === 0 ? "#edf3ff" : mixColors("#edf3ff", "#ffffff", getVariantMix(objectIndex) * 0.5);
+  }
+
+  return objectIndex === 0 ? palette.secondary : mixColors(palette.secondary, palette.neutral, getVariantMix(objectIndex) + 0.12);
+}
+
 export function resolveMaterialStyleToken(
   theme: ThemeToken,
   materialPreset: MaterialPresetToken,
   rawStyle?: string
 ): MaterialStyleToken {
   const normalizedStyle = typeof rawStyle === "string" ? normalizeStyleToken(rawStyle) : "";
-
-  if (["glassmorphism", "glass", "glass_frost"].includes(normalizedStyle)) {
-    return "glassmorphism";
-  }
-
-  if (["frosted", "frosted_glass"].includes(normalizedStyle)) {
-    return "frosted";
-  }
-
-  if (["chrome", "metal", "metallic", "premium"].includes(normalizedStyle)) {
-    return "chrome";
-  }
-
-  if (["matte_dark", "dark_matte"].includes(normalizedStyle)) {
-    return "matte_dark";
-  }
-
-  if (["neon", "glow", "glowing", "futuristic"].includes(normalizedStyle)) {
-    return "neon";
-  }
-
-  if (["clay", "matte", "minimal"].includes(normalizedStyle)) {
-    return "clay";
-  }
 
   switch (materialPreset) {
     case "glass_frost":
@@ -139,11 +144,43 @@ export function resolveMaterialStyleToken(
     case "metal_chrome":
       return "chrome";
     case "metal_brushed":
+      if (["matte_dark", "dark_matte"].includes(normalizedStyle)) {
+        return "matte_dark";
+      }
+
       return theme === "dark" ? "matte_dark" : "chrome";
     case "plastic_gloss":
+      if (["neon", "glow", "glowing", "futuristic"].includes(normalizedStyle)) {
+        return "neon";
+      }
+
       return theme === "futuristic" ? "neon" : "clay";
     case "matte_soft":
     default:
+      if (["glassmorphism", "glass", "glass_frost"].includes(normalizedStyle)) {
+        return "glassmorphism";
+      }
+
+      if (["frosted", "frosted_glass"].includes(normalizedStyle)) {
+        return "frosted";
+      }
+
+      if (["chrome", "metal", "metallic", "premium"].includes(normalizedStyle)) {
+        return "chrome";
+      }
+
+      if (["matte_dark", "dark_matte"].includes(normalizedStyle)) {
+        return "matte_dark";
+      }
+
+      if (["neon", "glow", "glowing", "futuristic"].includes(normalizedStyle)) {
+        return "neon";
+      }
+
+      if (["clay", "matte", "minimal"].includes(normalizedStyle)) {
+        return "clay";
+      }
+
       switch (theme) {
         case "dark":
           return "matte_dark";
@@ -162,26 +199,31 @@ export function resolveMaterialStyleToken(
 export function getMaterial(
   theme: ThemeToken,
   materialPreset: MaterialPresetToken,
+  lightingPreset: LightingPresetToken,
   name = "",
   objectIndex = 0,
   rawStyle?: string
 ): Material {
   const normalizedName = name.toLowerCase();
   const palette = THEME_PALETTES[theme];
+  const accentColor = getAccentColor(theme, lightingPreset);
   const materialStyle = normalizedName.includes("ice")
     ? "frosted"
     : resolveMaterialStyleToken(theme, materialPreset, rawStyle);
   const supportMix = getVariantMix(objectIndex);
   const mainColor = objectIndex === 0;
+  const accentObject = isAccentObject(name) && lightingPreset === "neon_edge";
 
   switch (materialStyle) {
     case "glassmorphism":
       return {
         type: "glass",
-        color: mainColor ? palette.secondary : mixColors(palette.secondary, palette.neutral, supportMix + 0.12),
-        metalness: mainColor ? 0.12 : 0.05,
-        roughness: mainColor ? 0 : 0.08,
-        transmission: mainColor ? 0.85 : 0.72
+        color: getGlassBaseColor(theme, lightingPreset, objectIndex),
+        metalness: mainColor ? 0.08 : 0.03,
+        roughness: mainColor ? 0.06 : 0.14,
+        transmission: mainColor ? 0.88 : 0.74,
+        emissive: accentObject ? accentColor : undefined,
+        emissiveIntensity: accentObject ? (mainColor ? 0.3 : 0.5) : undefined
       };
 
     case "matte_dark":
@@ -198,7 +240,7 @@ export function getMaterial(
         color: mainColor ? mixColors(palette.dark, palette.secondary, 0.22) : mixColors(palette.secondary, palette.neutral, supportMix + 0.08),
         metalness: mainColor ? 0.2 : 0.1,
         roughness: mainColor ? 0.08 : 0.18,
-        emissive: palette.accent,
+        emissive: accentColor,
         emissiveIntensity: mainColor ? 1.2 : 0.7
       };
 
@@ -214,10 +256,12 @@ export function getMaterial(
     case "frosted":
       return {
         type: "glass",
-        color: mainColor ? "#ffffff" : mixColors("#ffffff", palette.secondary, supportMix * 0.6),
-        metalness: 0.04,
-        roughness: mainColor ? 0.3 : 0.42,
-        transmission: mainColor ? 0.6 : 0.5
+        color: mainColor ? "#f8fbff" : mixColors("#f8fbff", palette.secondary, supportMix * 0.5),
+        metalness: 0.03,
+        roughness: mainColor ? 0.18 : 0.28,
+        transmission: mainColor ? 0.68 : 0.56,
+        emissive: accentObject ? accentColor : undefined,
+        emissiveIntensity: accentObject ? 0.35 : undefined
       };
 
     case "clay":

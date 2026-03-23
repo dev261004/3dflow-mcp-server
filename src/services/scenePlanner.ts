@@ -1,6 +1,8 @@
 import { normalizeDesignTokens } from "../types/designTokens.js";
 import { extractObjectHints } from "./promptRefiner.js";
 
+export const MAX_SCENE_PLAN_OBJECTS = 4;
+
 const INVALID_OBJECTS = [
   "light",
   "lighting",
@@ -30,6 +32,17 @@ function normalizeObjectHints(value: unknown) {
     .filter(Boolean);
 }
 
+function normalizeConfirmedObjects(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .flatMap((item) => extractObjectHints(item))
+    .filter(Boolean);
+}
+
 export function createScenePlan(prompt: string, context: Record<string, unknown> = {}) {
   const designTokens = normalizeDesignTokens(context.design_tokens, {
     use_case: context.use_case,
@@ -37,8 +50,14 @@ export function createScenePlan(prompt: string, context: Record<string, unknown>
     animation: context.animation
   });
 
+  const confirmedObjects = normalizeConfirmedObjects(context.confirmed_objects);
   const objectHints = normalizeObjectHints(context.object_hints);
-  const extractedObjects = objectHints.length > 0 ? objectHints : extractObjectHints(prompt);
+  const extractedObjects =
+    confirmedObjects.length > 0
+      ? confirmedObjects
+      : objectHints.length > 0
+        ? objectHints
+        : extractObjectHints(prompt);
   const cleanedObjects = [...new Set(filterObjects(extractedObjects))];
 
   return {

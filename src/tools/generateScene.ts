@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { buildScene } from "../services/sceneBuilder.js";
+import { MAX_SCENE_PLAN_OBJECTS } from "../services/scenePlanner.js";
 import { designTokensSchema, normalizeDesignTokens } from "../types/designTokens.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
@@ -26,6 +27,7 @@ Generate a complete 3D scene from a structured scene plan.
 
 Your job:
 - Convert the scene plan into structured scene data
+- Drive materials, lighting, background, and layout from design_tokens when present
 
 Rules:
 - Do NOT modify the scene plan
@@ -39,7 +41,7 @@ This tool is deterministic and does not interpret intent.
 `,
     parameters: z.object({
         scene_plan: z.object({
-            objects: z.array(z.string()).min(1).max(3),
+            objects: z.array(z.string()).min(1).max(MAX_SCENE_PLAN_OBJECTS),
             style: z.string().optional(),
             animation: z.string().optional(),
             use_case: z.string().optional(),
@@ -62,8 +64,8 @@ This tool is deterministic and does not interpret intent.
         if (objects.length === 0) {
             throw new Error("Scene plan must include at least one object");
         }
-        if (objects.length > 3) {
-            throw new Error("Maximum 3 objects allowed");
+        if (objects.length > MAX_SCENE_PLAN_OBJECTS) {
+            throw new Error(`Maximum ${MAX_SCENE_PLAN_OBJECTS} objects allowed`);
         }
         const scene = buildScene({
             ...normalizedPlan,
@@ -75,7 +77,8 @@ This tool is deterministic and does not interpret intent.
         });
 
         return createToolResult({
-            scene_data: scene
+            scene_data: scene,
+            warnings: scene.notes ?? []
         });
     }
 };

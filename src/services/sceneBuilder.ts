@@ -6,24 +6,73 @@ import {
     BackgroundPresetToken,
     CompositionPresetToken,
     LightingPresetToken,
+    MaterialPresetToken,
+    ThemeToken,
     normalizeDesignTokens
 } from "../types/designTokens.js";
 
-function getBackgroundColor(preset: BackgroundPresetToken) {
+function normalizeStyleText(value?: string) {
+    return typeof value === "string" ? value.toLowerCase() : "";
+}
+
+function getAccentColor(theme: ThemeToken, lightingPreset: LightingPresetToken) {
+    if (lightingPreset === "neon_edge") {
+        return "#00e5ff";
+    }
+
+    switch (theme) {
+        case "premium":
+            return "#c6924c";
+        case "futuristic":
+            return "#49d7ff";
+        case "playful":
+            return "#ff5cc8";
+        case "dark":
+            return "#7c86ff";
+        case "minimal":
+        default:
+            return "#8ca4ff";
+    }
+}
+
+function getBackgroundColor(
+    preset: BackgroundPresetToken,
+    theme: ThemeToken,
+    lightingPreset: LightingPresetToken,
+    materialPreset: MaterialPresetToken,
+    rawStyle?: string
+) {
+    const normalizedStyle = normalizeStyleText(rawStyle);
+    const favorsDeepBackdrop =
+        lightingPreset === "neon_edge" ||
+        theme === "futuristic" ||
+        normalizedStyle.includes("cinematic") ||
+        normalizedStyle.includes("fintech") ||
+        materialPreset === "glass_frost";
+
     switch (preset) {
         case "dark_studio":
-            return "#0a0a0f";
+            return "#070b12";
         case "gradient_soft":
-            return "#e8eefc";
+            return favorsDeepBackdrop ? "#081425" : "#dfe9fb";
         case "gradient_vivid":
-            return "#101a32";
+            return lightingPreset === "neon_edge" ? "#07182d" : "#101a32";
         case "light_clean":
         default:
             return "#f7f7f4";
     }
 }
 
-function createLightingRig(preset: LightingPresetToken): Light[] {
+function createLightingRig(
+    preset: LightingPresetToken,
+    theme: ThemeToken,
+    materialPreset: MaterialPresetToken,
+    rawStyle?: string
+): Light[] {
+    const accentColor = getAccentColor(theme, preset);
+    const highlightColor = materialPreset === "glass_frost" ? "#f5fbff" : "#ffffff";
+    const fillColor = preset === "neon_edge" ? "#7cf7ff" : accentColor;
+
     switch (preset) {
         case "studio_dramatic":
             return [
@@ -39,6 +88,13 @@ function createLightingRig(preset: LightingPresetToken): Light[] {
                     position: [2.5, 5, 1.5],
                     intensity: 1.4,
                     color: "#fff4dd"
+                },
+                {
+                    id: uuidv4(),
+                    type: "directional",
+                    position: [-3.2, 2.6, 2.4],
+                    intensity: normalizeStyleText(rawStyle).includes("cinematic") ? 0.78 : 0.58,
+                    color: materialPreset === "glass_frost" ? "#d7ecff" : "#f4dcc0"
                 }
             ];
         case "ambient_bright":
@@ -62,15 +118,29 @@ function createLightingRig(preset: LightingPresetToken): Light[] {
                 {
                     id: uuidv4(),
                     type: "ambient",
-                    intensity: 0.45,
-                    color: "#cbe1ff"
+                    intensity: 0.24,
+                    color: "#d9ecff"
                 },
                 {
                     id: uuidv4(),
                     type: "spot",
-                    position: [3, 4.5, 1],
-                    intensity: 1.25,
-                    color: "#74c0ff"
+                    position: [-3.8, 2.6, 2.4],
+                    intensity: 1.08,
+                    color: "#00e5ff"
+                },
+                {
+                    id: uuidv4(),
+                    type: "spot",
+                    position: [3.4, 4.8, -1.1],
+                    intensity: 0.92,
+                    color: "#34d399"
+                },
+                {
+                    id: uuidv4(),
+                    type: "directional",
+                    position: [2.8, 3.2, 2.8],
+                    intensity: 0.46,
+                    color: materialPreset === "glass_frost" ? highlightColor : fillColor
                 }
             ];
         case "studio_soft":
@@ -80,14 +150,14 @@ function createLightingRig(preset: LightingPresetToken): Light[] {
                     id: uuidv4(),
                     type: "ambient",
                     intensity: 0.6,
-                    color: "#ffffff"
+                    color: highlightColor
                 },
                 {
                     id: uuidv4(),
                     type: "spot",
                     position: [2, 5, 2],
                     intensity: 1.1,
-                    color: "#ffffff"
+                    color: materialPreset === "glass_frost" ? "#eef6ff" : "#ffffff"
                 }
             ];
     }
@@ -130,6 +200,7 @@ export function buildScene(plan: any): SceneData {
     const rawStyle = typeof plan?.style === "string" ? plan.style : undefined;
 
     const objects: SceneObject[] = [];
+    const notes: string[] = [];
 
     // 🧠 Generate objects
     if (plan.objects && Array.isArray(plan.objects)) {
@@ -141,12 +212,17 @@ export function buildScene(plan: any): SceneData {
                 objName,
                 designTokens.theme,
                 designTokens.material_preset,
+                designTokens.lighting_preset,
                 designTokens.composition,
                 index,
                 rawStyle
             );
 
             objects.push(obj);
+
+            if (obj.asset && obj.asset_confirmed === false) {
+                notes.push(`Procedural fallback will be used for ${obj.name || obj.asset} because ${obj.asset} is not confirmed.`);
+            }
         });
     }
 
@@ -157,6 +233,7 @@ export function buildScene(plan: any): SceneData {
                 "default_box",
                 designTokens.theme,
                 designTokens.material_preset,
+                designTokens.lighting_preset,
                 designTokens.composition,
                 0,
                 rawStyle
@@ -169,6 +246,7 @@ export function buildScene(plan: any): SceneData {
 
     return {
         scene_id: sceneId,
+        notes,
 
         metadata: {
             title: "Generated Scene",
@@ -181,12 +259,23 @@ export function buildScene(plan: any): SceneData {
         environment: {
             background: {
                 type: "color",
-                value: getBackgroundColor(designTokens.background_preset)
+                value: getBackgroundColor(
+                    designTokens.background_preset,
+                    designTokens.theme,
+                    designTokens.lighting_preset,
+                    designTokens.material_preset,
+                    rawStyle
+                )
             }
         },
 
         camera: createCamera(designTokens.composition),
-        lighting: createLightingRig(designTokens.lighting_preset),
+        lighting: createLightingRig(
+            designTokens.lighting_preset,
+            designTokens.theme,
+            designTokens.material_preset,
+            rawStyle
+        ),
 
         objects,
         animations

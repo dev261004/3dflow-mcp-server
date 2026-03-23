@@ -17,17 +17,6 @@ import {
   UseCaseToken
 } from "../types/designTokens.js";
 
-type TokenCategory =
-  | "use_case"
-  | "theme"
-  | "material_preset"
-  | "animation"
-  | "lighting_preset"
-  | "background_preset"
-  | "composition";
-
-type MatchMap = Record<TokenCategory, string[]>;
-
 interface MatchRule<T extends string> {
   token: T;
   keywords: string[];
@@ -178,6 +167,18 @@ const OBJECT_ALIASES: Record<string, string> = {
   "perfume bottle": "perfume",
   perfumes: "perfume",
   perfume: "perfume",
+  "credit card": "credit card",
+  "credit cards": "credit card",
+  "debit card": "credit card",
+  "payment card": "credit card",
+  "glowing orb": "orb",
+  "glow orb": "orb",
+  orbs: "orb",
+  orb: "orb",
+  "data ring": "ring",
+  "halo ring": "ring",
+  rings: "ring",
+  ring: "ring",
   smartphone: "phone",
   smartphones: "phone",
   phones: "phone",
@@ -240,6 +241,16 @@ const NON_OBJECT_WORDS = new Set([
   "campaign",
   "product",
   "brand",
+  "ui",
+  "interface",
+  "screen",
+  "payment",
+  "success",
+  "checkout",
+  "dashboard",
+  "startup",
+  "company",
+  "fintech",
   "3d",
   "for",
   "with",
@@ -329,6 +340,13 @@ function uniqueWords(values: string[]) {
   return [...new Set(values)];
 }
 
+interface AliasMatch {
+  alias: string;
+  canonical: string;
+  start: number;
+  length: number;
+}
+
 function titleForUseCase(useCase: UseCaseToken) {
   switch (useCase) {
     case "advertisement":
@@ -346,21 +364,85 @@ function formatToken(value: string) {
   return value.replace(/_/g, " ");
 }
 
-export function extractObjectHints(userPrompt: string) {
-  const normalizedPrompt = normalizeText(userPrompt);
-  const objects: string[] = [];
-
+function findAliasMatches(normalizedPrompt: string) {
+  const matches: AliasMatch[] = [];
   const aliasEntries = Object.entries(OBJECT_ALIASES).sort((left, right) => right[0].length - left[0].length);
+  const words = normalizedPrompt.split(" ");
+  const consumedIndexes = new Set<number>();
 
   for (const [alias, canonical] of aliasEntries) {
-    if (countKeywordMatches(normalizedPrompt, alias) > 0) {
-      objects.push(canonical);
+    const aliasWords = normalizeText(alias).split(" ").filter(Boolean);
+
+    if (aliasWords.length === 0 || aliasWords.length > words.length) {
+      continue;
+    }
+
+    for (let index = 0; index <= words.length - aliasWords.length; index += 1) {
+      const candidate = words.slice(index, index + aliasWords.length);
+      const isMatch = aliasWords.every((aliasWord, aliasIndex) => candidate[aliasIndex] === aliasWord);
+
+      if (!isMatch) {
+        continue;
+      }
+
+      const overlapsExistingMatch = candidate.some((_, candidateIndex) => consumedIndexes.has(index + candidateIndex));
+
+      if (overlapsExistingMatch) {
+        continue;
+      }
+
+      matches.push({
+        alias,
+        canonical,
+        start: index,
+        length: aliasWords.length
+      });
+
+      for (let aliasIndex = 0; aliasIndex < aliasWords.length; aliasIndex += 1) {
+        consumedIndexes.add(index + aliasIndex);
+      }
     }
   }
 
-  const words = normalizedPrompt.split(" ");
+  matches.sort((left, right) => left.start - right.start);
 
-  for (const word of words) {
+  return { matches, words, consumedIndexes };
+}
+
+function createConfirmedObjectLabel(match: AliasMatch, normalizedPrompt: string) {
+  const normalizedAlias = normalizeText(match.alias);
+
+  if (match.canonical === "phone") {
+    if (countKeywordMatches(normalizedPrompt, "payment success ui") > 0) {
+      return `${normalizedAlias} with payment success ui`;
+    }
+
+    if (countKeywordMatches(normalizedPrompt, "payment ui") > 0) {
+      return `${normalizedAlias} with payment ui`;
+    }
+  }
+
+  return normalizedAlias;
+}
+
+export function extractObjectHints(userPrompt: string) {
+  const normalizedPrompt = normalizeText(userPrompt);
+  const objects: string[] = [];
+  const { matches, words, consumedIndexes } = findAliasMatches(normalizedPrompt);
+
+  for (const match of matches) {
+    objects.push(match.canonical);
+  }
+
+  if (uniqueWords(objects).length >= 3) {
+    return uniqueWords(objects);
+  }
+
+  for (const [index, word] of words.entries()) {
+    if (consumedIndexes.has(index)) {
+      continue;
+    }
+
     if (!word || word.length < 3 || /^\d+$/.test(word)) {
       continue;
     }
@@ -378,15 +460,29 @@ export function extractObjectHints(userPrompt: string) {
     objects.push(canonicalWord);
   }
 
-  return uniqueWords(objects).slice(0, 3);
+  return uniqueWords(objects);
 }
 
-function buildRefinedPrompt(designTokens: DesignTokens, objectHints: string[]) {
-  const subject = objectHints.length > 0 ? objectHints.join(", ") : "the main product";
+export function extractConfirmedObjects(userPrompt: string) {
+  const normalizedPrompt = normalizeText(userPrompt);
+  const { matches } = findAliasMatches(normalizedPrompt);
+  const confirmedObjects = matches.map((match) => createConfirmedObjectLabel(match, normalizedPrompt));
+
+  return uniqueWords(confirmedObjects);
+}
+
+function normalizePromptDetail(userPrompt: string) {
+  return userPrompt.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+}
+
+function buildRefinedPrompt(userPrompt: string, designTokens: DesignTokens, confirmedObjects: string[]) {
+  const subject = confirmedObjects.length > 0 ? confirmedObjects.join(", ") : "the main product";
   const animationClause =
     designTokens.animation === "none" ? "without motion" : `with ${formatToken(designTokens.animation)} motion`;
+  const promptDetail = normalizePromptDetail(userPrompt);
 
   return [
+    `Preserve these request details: ${promptDetail}.`,
     `Create a ${designTokens.theme} ${titleForUseCase(designTokens.use_case)} 3D scene`,
     `using ${formatToken(designTokens.material_preset)} materials`,
     `${formatToken(designTokens.lighting_preset)} lighting`,
@@ -419,26 +515,17 @@ export function refinePrompt(userPrompt: string) {
   });
 
   const objectHints = extractObjectHints(userPrompt);
-
-  const matchedKeywords: MatchMap = {
-    use_case: useCaseMatch.matchedKeywords,
-    theme: themeMatch.matchedKeywords,
-    material_preset: materialMatch.matchedKeywords,
-    animation: animationMatch.matchedKeywords,
-    lighting_preset: lightingMatch.matchedKeywords,
-    background_preset: backgroundMatch.matchedKeywords,
-    composition: compositionMatch.matchedKeywords
-  };
+  const confirmedObjects = extractConfirmedObjects(userPrompt);
 
   return {
-    refined_prompt: buildRefinedPrompt(designTokens, objectHints),
+    refined_prompt: buildRefinedPrompt(userPrompt, designTokens, confirmedObjects),
     context: {
       use_case: designTokens.use_case,
       style: designTokens.theme,
       animation: designTokens.animation,
       design_tokens: designTokens,
       object_hints: objectHints,
-      matched_keywords: matchedKeywords
+      confirmed_objects: confirmedObjects
     }
   };
 }
