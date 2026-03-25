@@ -36,11 +36,12 @@ function createFloatAnimation(object: SceneObject): Animation {
   };
 }
 
-function createRotateAnimation(object: SceneObject, speed = 0.4, range = 0.04): Animation {
+function createRotateAnimation(object: SceneObject, speed = 0.4, range = 6.28): Animation {
   return {
     id: uuidv4(),
     ...createAnimationTarget(object),
     type: "rotate",
+    resolved_semantics: range >= Math.PI ? "continuous" : "oscillation",
     config: {
       speed,
       axis: "y",
@@ -111,7 +112,7 @@ export function buildAnimations(
   }
 
   if (normalizedIntent === "rotate") {
-    animations.push(createRotateAnimation(mainObject, 0.55, 0.08));
+    animations.push(createRotateAnimation(mainObject, 0.55, 6.28));
   }
 
   if (normalizedIntent === "pulse") {

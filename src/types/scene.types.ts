@@ -62,6 +62,7 @@ export interface Animation {
   target: string;
   target_id?: string;
   type: "float" | "rotate" | "pulse" | "bounce";
+  resolved_semantics?: "continuous" | "oscillation";
   config:
     | {
         amplitude: number;
@@ -74,6 +75,7 @@ export interface Animation {
         range: number;
       }
     | {
+        scale?: number;
         scale_range: [number, number];
         speed: number;
       };

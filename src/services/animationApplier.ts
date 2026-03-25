@@ -1,12 +1,12 @@
-import { buildAnimations } from "./animationEngine.js";
+import type { SceneData } from "../types/scene.types.js";
+import { buildApplyAnimationOutput } from "../tools/applyAnimation.tool.js";
 
-export function applyAnimation(scene: any, type: string) {
-  const updated = JSON.parse(JSON.stringify(scene));
+export function applyAnimation(scene: SceneData, type: "rotate" | "rotation" | "float" | "pulse" | "bounce") {
+  const result = buildApplyAnimationOutput({
+    scene_data: scene,
+    animation_type: type,
+    merge: true
+  });
 
-  const mainObject = updated.objects[0];
-
-  if (!mainObject) return updated;
-  updated.animations = buildAnimations(updated.objects, type);
-
-  return updated;
+  return result.status === "SUCCESS" ? result.scene_data : scene;
 }

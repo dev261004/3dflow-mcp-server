@@ -279,6 +279,19 @@ function buildAnimationHooks(objects: SceneObject[], animations: Animation[]) {
       }
 
       if (animation.type === "rotate" && "range" in animation.config) {
+        const isContinuous =
+          animation.resolved_semantics === "continuous" ||
+          animation.config.range >= Math.PI;
+
+        if (isContinuous) {
+          return `
+  useFrame((state) => {
+    if (!${refName}.current) return;
+    const t = state.clock.getElapsedTime();
+    ${refName}.current.rotation.${animation.config.axis} = ${getAxisBaseValue(targetObject.rotation, animation.config.axis)} + t * ${animation.config.speed};
+  });`;
+        }
+
         return `
   useFrame((state) => {
     if (!${refName}.current) return;
@@ -298,6 +311,24 @@ function buildAnimationHooks(objects: SceneObject[], animations: Animation[]) {
 
       if (animation.type === "pulse" && "scale_range" in animation.config) {
         const [minScale, maxScale] = animation.config.scale_range;
+        const scaleDelta = maxScale - minScale;
+
+        return `
+  useFrame((state) => {
+    if (!${refName}.current) return;
+    const t = state.clock.getElapsedTime() * ${animation.config.speed};
+    const pulseScale = ${minScale} + ((Math.sin(t) + 1) / 2) * ${scaleDelta};
+    ${refName}.current.scale.set(
+      ${targetObject.scale[0]} * pulseScale,
+      ${targetObject.scale[1]} * pulseScale,
+      ${targetObject.scale[2]} * pulseScale
+    );
+  });`;
+      }
+
+      if (animation.type === "pulse" && "scale" in animation.config) {
+        const maxScale = animation.config.scale ?? 1.1;
+        const minScale = 1;
         const scaleDelta = maxScale - minScale;
 
         return `
