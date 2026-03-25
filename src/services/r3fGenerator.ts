@@ -573,8 +573,11 @@ function buildSynthesisRequiredResponse(
       object_name: contract.object_name,
       category: contract.category,
       bounding_box: contract.bounding_box,
+      complexity_tier: contract.complexity_tier,
       min_parts: contract.min_parts,
+      max_parts: contract.max_parts,
       complexity_hint: contract.complexity_hint,
+      lod_note: contract.lod_note,
       constraints: contract.constraints,
       expected_output: {
         component_name: `${toPascalCase(contract.object_name)}Geometry`,

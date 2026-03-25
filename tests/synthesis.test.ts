@@ -211,13 +211,17 @@ test("buildSynthesisContract returns expected robot contract", () => {
     console.log(JSON.stringify({
       type: contract.__type,
       bounding_box: contract.bounding_box,
-      min_parts: contract.min_parts
+      min_parts: contract.min_parts,
+      complexity_tier: contract.complexity_tier,
+      max_parts: contract.max_parts
     }));
   `);
 
   assert.equal(result.type, "SYNTHESIS_REQUIRED");
   assert.deepEqual(result.bounding_box, [1, 2, 1]);
-  assert.equal(result.min_parts, 7);
+  assert.equal(result.min_parts, 28);
+  assert.equal(result.complexity_tier, "high");
+  assert.equal(result.max_parts, null);
 });
 
 test("handleGenerateR3FCode requests synthesis when components are missing", () => {
@@ -272,7 +276,7 @@ test("synthesis cache stores and retrieves geometry", () => {
 
 test("synthesize_geometry tool returns a contract", () => {
   const result = runJson(`
-    import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.js";
+    import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.tool.js";
     import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
 
     const payload = unwrapToolPayload(await synthesizeGeometryTool.execute({
@@ -289,12 +293,13 @@ test("synthesize_geometry tool returns a contract", () => {
 
   assert.equal(result.synthesis_contract.__type, "SYNTHESIS_REQUIRED");
   assert.equal(result.synthesis_contract.object_name, "robot");
+  assert.equal(result.synthesis_contract.complexity_tier, "high");
   assert.equal(result.ready_to_generate, true);
 });
 
 test("generate_scene_plan treats mixed style cues as a recommendation instead of a warning", () => {
   const result = runJson(`
-    import { generateScenePlanTool } from "./dist/tools/generateScenePlan.js";
+    import { generateScenePlanTool } from "./dist/tools/generateScenePlan.tool.js";
     import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
 
     const payload = unwrapToolPayload(await generateScenePlanTool.execute({
@@ -325,7 +330,7 @@ test("generate_scene_plan treats mixed style cues as a recommendation instead of
 
 test("optimize_for_web tolerates objects without material definitions", () => {
   const result = runJson(`
-    import { optimizeForWebTool } from "./dist/tools/optimizeForWeb.js";
+    import { optimizeForWebTool } from "./dist/tools/optimizeForWeb.tool.js";
     import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
 
     const payload = unwrapToolPayload(await optimizeForWebTool.execute({

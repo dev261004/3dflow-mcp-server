@@ -1,4 +1,5 @@
 import type { ObjectCategory } from "../lib/objectCategories.js";
+import type { ComplexityTier } from "../lib/complexity.profiles.js";
 
 export type SynthesisStatus = "SYNTHESIS_REQUIRED" | "SUCCESS";
 
@@ -22,8 +23,11 @@ export interface SynthesisContract {
   object_name: string;
   category: ObjectCategory;
   bounding_box: [number, number, number];
+  complexity_tier: ComplexityTier;
   min_parts: number;
-  complexity_hint: "low" | "medium" | "high";
+  max_parts: number | null;
+  complexity_hint: ComplexityTier;
+  lod_note: string;
   style: string;
   material_preset: string;
   base_color: string;
@@ -39,8 +43,11 @@ export interface SynthesisInstruction {
   object_name: string;
   category: string;
   bounding_box: [number, number, number];
+  complexity_tier: ComplexityTier;
   min_parts: number;
-  complexity_hint: "low" | "medium" | "high";
+  max_parts: number | null;
+  complexity_hint: ComplexityTier;
+  lod_note: string;
   constraints: SynthesisConstraints;
   expected_output: {
     component_name: string;
