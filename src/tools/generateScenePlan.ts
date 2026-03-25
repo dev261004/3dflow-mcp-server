@@ -208,6 +208,24 @@ function alignDesignTokensWithResolvedStyle(designTokens: DesignTokens, resolved
   };
 }
 
+function buildStyleRecommendation(
+  resolvedStyle: ThemeToken,
+  scoredThemes: ThemeToken[],
+  styleSignals: Record<ThemeToken, { score: number; matchedKeywords: string[] }>
+) {
+  if (scoredThemes.length <= 1) {
+    return null;
+  }
+
+  return {
+    type: "style_resolution",
+    message: `Multiple style cues were detected (${scoredThemes.join(", ")}). "${resolvedStyle}" was selected for the single-token style field.`,
+    selected_style: resolvedStyle,
+    detected_style_cues: scoredThemes,
+    matched_keywords: styleSignals[resolvedStyle].matchedKeywords
+  };
+}
+
 export const generateScenePlanTool = {
   name: "generate_scene_plan",
   description: `
@@ -325,13 +343,8 @@ Return structured scene plan data plus warnings and constraints.
       );
     }
 
-    if (scoredThemes.length > 1) {
-      warnings.push(
-        `Prompt mixes multiple style cues (${scoredThemes.join(", ")}). The "style" field supports only one token, so "${resolvedStyle}" was selected and the rest remain implicit in the prompt and design tokens.`
-      );
-    }
-
     const adjustedDesignTokens = alignDesignTokensWithResolvedStyle(designTokens, resolvedStyle);
+    const styleRecommendation = buildStyleRecommendation(resolvedStyle, scoredThemes, styleSignals);
 
     return createToolResult({
       scene_plan: {
@@ -341,6 +354,7 @@ Return structured scene plan data plus warnings and constraints.
         design_tokens: adjustedDesignTokens
       },
       warnings,
+      recommendations: styleRecommendation ? [styleRecommendation] : [],
       constraints: {
         max_objects: MAX_SCENE_PLAN_OBJECTS,
         allowed_styles: [...THEME_VALUES],

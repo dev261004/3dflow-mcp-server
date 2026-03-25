@@ -378,19 +378,44 @@ function toPlaceholderToken(value: string) {
     .replace(/^_+|_+$/g, "") || "OBJECT";
 }
 
+function injectRootBindingsIntoJsx(jsx: string) {
+  return jsx.replace(/<([A-Za-z][\w.]*)((?:\s[^<>]*?)?)>/, (match, tagName: string, rawAttributes = "") => {
+    const attributes = rawAttributes || "";
+    const hasRef = /\bref\s*=/.test(attributes);
+    const hasPropsSpread = /\{\s*\.\.\.\s*props\s*\}/.test(attributes);
+    const bindingParts: string[] = [];
+
+    if (!hasRef) {
+      bindingParts.push("ref={ref}");
+    }
+
+    if (!hasPropsSpread) {
+      bindingParts.push("{...props}");
+    }
+
+    if (bindingParts.length === 0) {
+      return match;
+    }
+
+    const separator = attributes.trim() ? " " : "";
+    return `<${tagName}${attributes}${separator}${bindingParts.join(" ")}>`;
+  });
+}
+
 function normalizeInjectedComponent(componentName: string, jsxString: string) {
   const trimmed = jsxString.trim();
 
   if (/^const\s+\w+\s*=\s*React\.forwardRef/.test(trimmed)) {
-    return trimmed.replace(
+    return injectRootBindingsIntoJsx(trimmed.replace(
       /^const\s+\w+\s*=\s*React\.forwardRef/,
       `const ${componentName} = React.forwardRef`
-    );
+    ));
   }
 
   if (trimmed.startsWith("<")) {
+    const normalizedJsx = injectRootBindingsIntoJsx(trimmed);
     return `const ${componentName} = React.forwardRef((props, ref) => (
-${indent(trimmed, 2)}
+${indent(normalizedJsx, 2)}
 ));`;
   }
 
@@ -412,9 +437,7 @@ function buildSceneGraph(
       if (isSynthesisObject(object) && synthesizedComponents[object.id]) {
         const componentName = `${toPascalCase(object.name ?? object.id)}Geometry`;
         const lines = [
-          `      <group ${refProp}${position} ${rotation} ${scale}>`,
-          `        <${componentName} />`,
-          "      </group>"
+          `      <${componentName} ${refProp}${position} ${rotation} ${scale} />`
         ];
         const glowLight = buildEmissiveGlowLight(object);
 

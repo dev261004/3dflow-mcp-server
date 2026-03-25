@@ -23,7 +23,7 @@ function runJson(script) {
   return JSON.parse(output.trim());
 }
 
-function buildSceneScript({ includeSynthesized = false } = {}) {
+function buildSceneScript({ includeSynthesized = false, includeAnimation = false } = {}) {
   return `
     import { buildSynthesisContract } from "./dist/lib/synthesisContract.js";
     import { handleGenerateR3FCode } from "./dist/services/r3fGenerator.js";
@@ -105,7 +105,20 @@ function buildSceneScript({ includeSynthesized = false } = {}) {
           }
         }
       ],
-      animations: []
+      animations: ${includeAnimation ? `[
+        {
+          id: "anim_1",
+          target_id: "robot_1",
+          target: "robot",
+          type: "float",
+          config: {
+            amplitude: 0.2,
+            speed: 1,
+            axis: "y"
+          },
+          loop: true
+        }
+      ]` : "[]"}
     };
 
     const result = handleGenerateR3FCode(scene, {
@@ -215,10 +228,12 @@ test("handleGenerateR3FCode requests synthesis when components are missing", () 
 });
 
 test("handleGenerateR3FCode returns success when synthesized components are provided", () => {
-  const result = runJson(buildSceneScript({ includeSynthesized: true }));
+  const result = runJson(buildSceneScript({ includeSynthesized: true, includeAnimation: true }));
 
   assert.equal(result.status, "SUCCESS");
   assert.match(result.r3f_code, /RobotGeometry/);
+  assert.match(result.r3f_code, /const RobotGeometry = React\.forwardRef\(\(props, ref\) => \(\s*<group ref=\{ref\} \{\.\.\.props\}>/s);
+  assert.match(result.r3f_code, /<RobotGeometry ref=\{primaryRef\} position=\{\[0,0,0\]\} rotation=\{\[0,0,0\]\} scale=\{\[1,1,1\]\} \/>/);
 });
 
 test("synthesis cache stores and retrieves geometry", () => {
@@ -275,4 +290,92 @@ test("synthesize_geometry tool returns a contract", () => {
   assert.equal(result.synthesis_contract.__type, "SYNTHESIS_REQUIRED");
   assert.equal(result.synthesis_contract.object_name, "robot");
   assert.equal(result.ready_to_generate, true);
+});
+
+test("generate_scene_plan treats mixed style cues as a recommendation instead of a warning", () => {
+  const result = runJson(`
+    import { generateScenePlanTool } from "./dist/tools/generateScenePlan.js";
+    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+
+    const payload = unwrapToolPayload(await generateScenePlanTool.execute({
+      refined_prompt: "3D robot showcase with futuristic, sleek, high-tech, premium dark styling",
+      context: {
+        use_case: "website",
+        style: "futuristic",
+        animation: "none",
+        design_tokens: {
+          use_case: "website",
+          theme: "futuristic",
+          animation: "none"
+        }
+      }
+    }));
+
+    console.log(JSON.stringify(payload));
+  `);
+
+  assert.equal(result.scene_plan.style, "futuristic");
+  assert.equal(
+    result.warnings.some((warning) => warning.includes("Prompt mixes multiple style cues")),
+    false
+  );
+  assert.equal(result.recommendations[0].type, "style_resolution");
+  assert.equal(result.recommendations[0].selected_style, "futuristic");
+});
+
+test("optimize_for_web tolerates objects without material definitions", () => {
+  const result = runJson(`
+    import { optimizeForWebTool } from "./dist/tools/optimizeForWeb.js";
+    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+
+    const payload = unwrapToolPayload(await optimizeForWebTool.execute({
+      scene_data: {
+        scene_id: "scene_missing_material",
+        metadata: {
+          title: "Missing Material",
+          use_case: "showcase",
+          style: "minimal",
+          created_at: "2026-03-25T00:00:00.000Z"
+        },
+        environment: {
+          background: {
+            type: "color",
+            value: "#ffffff"
+          }
+        },
+        camera: {
+          type: "perspective",
+          position: [0, 1, 4],
+          fov: 45,
+          target: [0, 0, 0]
+        },
+        lighting: [
+          {
+            id: "light_1",
+            type: "ambient",
+            intensity: 0.5,
+            color: "#ffffff"
+          }
+        ],
+        objects: [
+          {
+            id: "broken_1",
+            type: "primitive",
+            shape: "box",
+            name: "broken box",
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1]
+          }
+        ],
+        animations: []
+      },
+      target: "mobile"
+    }));
+
+    console.log(JSON.stringify(payload));
+  `);
+
+  assert.equal(result.optimized_scene.objects[0].render_hints.transparency_mode, "opaque");
+  assert.equal(result.report.target, "mobile");
 });

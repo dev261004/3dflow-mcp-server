@@ -63,6 +63,11 @@ function isPrimitiveShape(shape: SceneObject["shape"]): shape is PrimitiveShape 
   return shape === "box" || shape === "sphere" || shape === "cylinder";
 }
 
+function getTransmissionValue(object: SceneObject) {
+  const transmission = object.material?.transmission;
+  return typeof transmission === "number" ? transmission : undefined;
+}
+
 function ensureRenderHints(object: SceneObject) {
   object.render_hints ??= {};
 
@@ -76,7 +81,7 @@ function ensureRenderHints(object: SceneObject) {
     object.render_hints.complexity ??= object.synthesis_contract.complexity_hint;
   }
 
-  if (typeof object.material.transmission === "number" && object.material.transmission > 0) {
+  if ((getTransmissionValue(object) ?? 0) > 0) {
     object.render_hints.transparency_mode ??= "physical";
   } else {
     object.render_hints.transparency_mode ??= "opaque";
@@ -99,7 +104,7 @@ function estimateObjectDrawCalls(object: SceneObject) {
     ? Math.max(1, object.render_hints?.min_parts ?? object.synthesis_contract?.min_parts ?? 1)
     : 1;
 
-  if (typeof object.material.transmission === "number" && object.material.transmission > 0) {
+  if ((getTransmissionValue(object) ?? 0) > 0) {
     drawCalls += 1;
   }
 
@@ -335,13 +340,20 @@ function optimizeTextures(object: SceneObject, target: OptimizationTarget, chang
 function optimizeMaterial(object: SceneObject, target: OptimizationTarget, changes: OptimizationChange[], fallbackLabel: string) {
   ensureRenderHints(object);
 
-  if (target === "mobile" && typeof object.material.transmission === "number" && object.material.transmission > 0) {
-    const originalTransmission = object.material.transmission;
+  const material = object.material;
+  if (!material) {
+    return;
+  }
 
-    object.material.type = "standard";
-    object.material.roughness = Number(Math.max(object.material.roughness ?? 0.2, 0.42).toFixed(2));
-    object.material.metalness = Number(Math.min(object.material.metalness ?? 0.08, 0.08).toFixed(2));
-    delete object.material.transmission;
+  const transmission = getTransmissionValue(object);
+
+  if (target === "mobile" && (transmission ?? 0) > 0) {
+    const originalTransmission = transmission!;
+
+    material.type = "standard";
+    material.roughness = Number(Math.max(material.roughness ?? 0.2, 0.42).toFixed(2));
+    material.metalness = Number(Math.min(material.metalness ?? 0.08, 0.08).toFixed(2));
+    delete material.transmission;
     object.render_hints!.transparency_mode = "approximate";
 
     changes.push({
@@ -349,13 +361,13 @@ function optimizeMaterial(object: SceneObject, target: OptimizationTarget, chang
       impact: "real",
       confidence: 0.9
     });
-  } else if (target === "desktop" && typeof object.material.transmission === "number" && object.material.transmission > 0.7) {
-    const previousTransmission = object.material.transmission;
-    const clampedTransmission = Number(Math.min(object.material.transmission, 0.7).toFixed(2));
+  } else if (target === "desktop" && (transmission ?? 0) > 0.7) {
+    const previousTransmission = transmission!;
+    const clampedTransmission = Number(Math.min(transmission!, 0.7).toFixed(2));
 
-    if (clampedTransmission < object.material.transmission) {
-      object.material.transmission = clampedTransmission;
-      object.material.roughness = Number(Math.max(object.material.roughness ?? 0.12, 0.12).toFixed(2));
+    if (clampedTransmission < transmission!) {
+      material.transmission = clampedTransmission;
+      material.roughness = Number(Math.max(material.roughness ?? 0.12, 0.12).toFixed(2));
       changes.push({
         description: `Reduced transmission intensity on ${describeObject(object, fallbackLabel)} from ${previousTransmission} to ${clampedTransmission}`,
         impact: "real",
@@ -364,12 +376,12 @@ function optimizeMaterial(object: SceneObject, target: OptimizationTarget, chang
     }
   }
 
-  if (typeof object.material.emissiveIntensity === "number") {
+  if (typeof material.emissiveIntensity === "number") {
     const factor = target === "mobile" ? 0.7 : 0.85;
-    const nextIntensity = Number((object.material.emissiveIntensity * factor).toFixed(2));
+    const nextIntensity = Number((material.emissiveIntensity * factor).toFixed(2));
 
-    if (nextIntensity !== object.material.emissiveIntensity) {
-      object.material.emissiveIntensity = nextIntensity;
+    if (nextIntensity !== material.emissiveIntensity) {
+      material.emissiveIntensity = nextIntensity;
       changes.push({
         description: `Trimmed emissive intensity on ${describeObject(object, fallbackLabel)} to ${nextIntensity}`,
         impact: "real",
@@ -378,12 +390,12 @@ function optimizeMaterial(object: SceneObject, target: OptimizationTarget, chang
     }
   }
 
-  if (typeof object.material.envMapIntensity === "number") {
+  if (typeof material.envMapIntensity === "number") {
     const factor = target === "mobile" ? 0.65 : 0.8;
-    const nextIntensity = Number((object.material.envMapIntensity * factor).toFixed(2));
+    const nextIntensity = Number((material.envMapIntensity * factor).toFixed(2));
 
-    if (nextIntensity !== object.material.envMapIntensity) {
-      object.material.envMapIntensity = nextIntensity;
+    if (nextIntensity !== material.envMapIntensity) {
+      material.envMapIntensity = nextIntensity;
       changes.push({
         description: `Lowered environment reflections on ${describeObject(object, fallbackLabel)} to ${nextIntensity}`,
         impact: "real",
@@ -470,7 +482,7 @@ function flagRepeatedGeometry(scene: SceneData, changes: OptimizationChange[], f
 function buildFurtherSuggestions(scene: SceneData, target: OptimizationTarget, lightsWereReduced: boolean) {
   const suggestions = new Set<string>();
   const hasSynthesizedObjects = scene.objects.some((object) => object.type === "synthesis_contract");
-  const hasTransmission = scene.objects.some((object) => typeof object.material.transmission === "number" && object.material.transmission > 0);
+  const hasTransmission = scene.objects.some((object) => (getTransmissionValue(object) ?? 0) > 0);
 
   if (hasSynthesizedObjects) {
     suggestions.add("Cache synthesized geometry per object/style/material combination to avoid repeated orchestration work");
