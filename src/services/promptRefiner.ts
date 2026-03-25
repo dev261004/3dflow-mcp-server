@@ -15,7 +15,7 @@ import {
   ThemeToken,
   USE_CASE_VALUES,
   UseCaseToken
-} from "../types/designTokens.js";
+} from "../lib/designTokens.js";
 
 interface MatchRule<T extends string> {
   token: T;

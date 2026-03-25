@@ -1,4 +1,4 @@
-import { normalizeDesignTokens } from "../types/designTokens.js";
+import { normalizeDesignTokens } from "../lib/designTokens.js";
 import { ColorHint, extractObjectHints } from "./promptRefiner.js";
 
 export const MAX_SCENE_PLAN_OBJECTS = 4;

@@ -1,13 +1,13 @@
 import { v4 as uuidv4 } from "uuid";
 import { buildSynthesisContract } from "../lib/synthesisContract.js";
 import { getMaterial } from "./materialService.js";
-import { Material, PrimitiveShape, SceneObject, Vector3 } from "../types/scene.js";
+import { Material, PrimitiveShape, SceneObject, Vector3 } from "../types/scene.types.js";
 import {
   CompositionPresetToken,
   LightingPresetToken,
   MaterialPresetToken,
   ThemeToken
-} from "../types/designTokens.js";
+} from "../lib/designTokens.js";
 
 const LAYOUT_POSITIONS: Record<CompositionPresetToken, Vector3[]> = {
   hero_centered: [

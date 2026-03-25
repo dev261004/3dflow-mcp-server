@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { handleGenerateR3FCode } from "../services/r3fGenerator.js";
-import { SceneData } from "../types/scene.js";
+import { SceneData } from "../types/scene.types.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
 export const generateR3FTool = {

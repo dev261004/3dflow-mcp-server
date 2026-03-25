@@ -5,7 +5,7 @@ import {
   SceneData,
   SceneObject,
   TextureResolution
-} from "../types/scene.js";
+} from "../types/scene.types.js";
 
 type OptimizationTarget = "desktop" | "mobile";
 

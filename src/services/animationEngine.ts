@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { Animation, SceneObject } from "../types/scene.js";
+import { Animation, SceneObject } from "../types/scene.types.js";
 
 function normalizeAnimationIntent(type: string) {
   const normalized = type.toLowerCase().trim();

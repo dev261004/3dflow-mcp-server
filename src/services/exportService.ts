@@ -3,7 +3,7 @@ import {
   R3FFramework,
   R3FTypingMode
 } from "./r3fGenerator.js";
-import { SceneData } from "../types/scene.js";
+import { SceneData } from "../types/scene.types.js";
 
 interface ExportSceneOptions {
   typing?: R3FTypingMode;

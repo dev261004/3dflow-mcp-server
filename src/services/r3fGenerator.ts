@@ -9,13 +9,13 @@ import {
   PrimitiveShape,
   SceneData,
   SceneObject
-} from "../types/scene.js";
+} from "../types/scene.types.js";
 import {
   AssembledR3FOutput,
   GenerateR3FResult,
   SynthesisContract,
   SynthesisRequiredOutput
-} from "../types/synthesis.js";
+} from "../types/synthesis.types.js";
 
 export type R3FTypingMode = "none" | "typescript" | "prop-types";
 export type R3FFramework = "nextjs" | "vite" | "plain";

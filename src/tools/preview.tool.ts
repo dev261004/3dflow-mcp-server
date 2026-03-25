@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { FastMCP } from "fastmcp";
-import type { SceneData, Vector3 } from "../types/scene.js";
+import type { SceneData, Vector3 } from "../types/scene.types.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 import type {
   PreviewGenerationOptions,
@@ -12,7 +12,7 @@ import type {
   PreviewSpatialValidationCheck,
   PreviewTextDescription,
   PreviewView
-} from "./preview.types.js";
+} from "../types/preview.types.js";
 
 const VIEWBOX_WIDTH = 600;
 const VIEWBOX_HEIGHT = 400;

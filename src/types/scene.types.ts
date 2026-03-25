@@ -1,5 +1,5 @@
-import type { DesignTokens } from "./designTokens.js";
-import type { SynthesisContract } from "./synthesis.js";
+import type { DesignTokens } from "../lib/designTokens.js";
+import type { SynthesisContract } from "./synthesis.types.js";
 
 export type Vector3 = [number, number, number];
 export type AnimationAxis = "x" | "y" | "z";

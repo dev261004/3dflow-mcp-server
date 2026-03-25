@@ -3,7 +3,7 @@ import { buildSynthesisContract } from "../lib/synthesisContract.js";
 import {
   MATERIAL_PRESET_VALUES,
   THEME_VALUES
-} from "../types/designTokens.js";
+} from "../lib/designTokens.js";
 import { createToolResult } from "../utils/toolPayload.js";
 import { generateId } from "../utils/idGenerator.js";
 

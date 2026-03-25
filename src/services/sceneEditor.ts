@@ -1,4 +1,4 @@
-import type { LightingPresetToken, ThemeToken } from "../types/designTokens.js";
+import type { LightingPresetToken, ThemeToken } from "../lib/designTokens.js";
 import { buildAnimations } from "./animationEngine.js";
 import { getMaterial } from "./materialService.js";
 

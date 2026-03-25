@@ -1,5 +1,5 @@
-import { Material } from "../types/scene.js";
-import { LightingPresetToken, MaterialPresetToken, ThemeToken } from "../types/designTokens.js";
+import { Material } from "../types/scene.types.js";
+import { LightingPresetToken, MaterialPresetToken, ThemeToken } from "../lib/designTokens.js";
 
 export type MaterialStyleToken =
   | "glassmorphism"

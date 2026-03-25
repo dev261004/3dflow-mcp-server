@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { createObject } from "./objectGenerator.js";
 import { buildAnimations } from "./animationEngine.js";
-import { Animation, ColorHint, Light, SceneData, SceneObject } from "../types/scene.js";
+import { Animation, ColorHint, Light, SceneData, SceneObject } from "../types/scene.types.js";
 import {
     BackgroundPresetToken,
     CompositionPresetToken,
@@ -9,7 +9,7 @@ import {
     MaterialPresetToken,
     ThemeToken,
     normalizeDesignTokens
-} from "../types/designTokens.js";
+} from "../lib/designTokens.js";
 
 function normalizeStyleText(value?: string) {
     return typeof value === "string" ? value.toLowerCase() : "";

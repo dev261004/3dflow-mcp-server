@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { exportScene } from "../services/exportService.js";
-import { SceneData } from "../types/scene.js";
+import { SceneData } from "../types/scene.types.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
 export const exportAssetTool = {

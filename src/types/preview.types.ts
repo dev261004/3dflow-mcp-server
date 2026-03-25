@@ -1,4 +1,4 @@
-import type { SceneData, Vector3 } from "../types/scene.js";
+import type { SceneData, Vector3 } from "./scene.types.js";
 
 export type PreviewView = "top" | "front" | "side";
 export type PreviewCheckStatus = "PASS" | "WARN" | "FAIL";

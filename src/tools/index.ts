@@ -1,15 +1,15 @@
 import { FastMCP } from "fastmcp";
-import { refinePromptTool } from "./refinePrompt.js";
-import { generateScenePlanTool } from "./generateScenePlan.js";
-import { generateSceneTool } from "./generateScene.js";
+import { refinePromptTool } from "./refinePrompt.tool.js";
+import { generateScenePlanTool } from "./generateScenePlan.tool.js";
+import { generateSceneTool } from "./generateScene.tool.js";
 import { previewTool } from "./preview.tool.js";
-import { optimizeForWebTool } from "./optimizeForWeb.js";
-import { generateR3FTool } from "./generateR3F.js";
-import { applyAnimationTool } from "./applyAnimation.js";
-import { exportAssetTool } from "./export_asset.js";
-import { integrationHelpTool } from "./integrationHelp.js";
-import { editSceneTool } from "./editScene.js";
-import { synthesizeGeometryTool } from "./synthesizeGeometry.js";
+import { optimizeForWebTool } from "./optimizeForWeb.tool.js";
+import { generateR3FTool } from "./generateR3F.tool.js";
+import { applyAnimationTool } from "./applyAnimation.tool.js";
+import { exportAssetTool } from "./export_asset.tool.js";
+import { integrationHelpTool } from "./integrationHelp.tool.js";
+import { editSceneTool } from "./editScene.tool.js";
+import { synthesizeGeometryTool } from "./synthesizeGeometry.tool.js";
 
 export function registerTools(server: FastMCP) {
   server.addTool(refinePromptTool);

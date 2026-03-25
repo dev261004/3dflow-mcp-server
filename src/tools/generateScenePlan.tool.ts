@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createScenePlan, MAX_SCENE_PLAN_OBJECTS } from "../services/scenePlanner.js";
-import { DesignTokens, THEME_VALUES, ThemeToken, normalizeDesignTokens } from "../types/designTokens.js";
+import { DesignTokens, THEME_VALUES, ThemeToken, normalizeDesignTokens } from "../lib/designTokens.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
 const STYLE_SIGNAL_RULES: Record<ThemeToken, Array<{ keyword: string; weight: number }>> = {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { buildScene } from "../services/sceneBuilder.js";
 import { MAX_SCENE_PLAN_OBJECTS } from "../services/scenePlanner.js";
-import { designTokensSchema, normalizeDesignTokens } from "../types/designTokens.js";
+import { designTokensSchema, normalizeDesignTokens } from "../lib/designTokens.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
 function normalizeScenePlan(scenePlan: unknown) {

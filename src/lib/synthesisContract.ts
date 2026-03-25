@@ -1,5 +1,5 @@
 import { CATEGORY_MAP, detectCategory } from "./objectCategories.js";
-import type { SynthesisContract } from "../types/synthesis.js";
+import type { SynthesisContract } from "../types/synthesis.types.js";
 
 export function buildSynthesisContract(params: {
   objectId: string;
