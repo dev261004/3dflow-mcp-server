@@ -1,5 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
-import { Light, SceneData, SceneObject, TextureResolution } from "../types/scene.js";
+import {
+  Light,
+  PrimitiveShape,
+  SceneData,
+  SceneObject,
+  TextureResolution
+} from "../types/scene.js";
 
 type OptimizationTarget = "desktop" | "mobile";
 
@@ -24,13 +30,13 @@ interface OptimizationReport {
   draw_call_breakdown: { object: string; draw_calls: number }[];
 }
 
-const DEFAULT_SEGMENTS: Record<NonNullable<SceneObject["shape"]>, number> = {
+const DEFAULT_SEGMENTS: Record<PrimitiveShape, number> = {
   box: 1,
   sphere: 64,
   cylinder: 48
 };
 
-const SEGMENT_CAPS: Record<OptimizationTarget, Record<NonNullable<SceneObject["shape"]>, number>> = {
+const SEGMENT_CAPS: Record<OptimizationTarget, Record<PrimitiveShape, number>> = {
   desktop: {
     box: 1,
     sphere: 32,
@@ -53,15 +59,21 @@ const TEXTURE_TARGETS: Record<OptimizationTarget, TextureResolution> = {
   mobile: "low"
 };
 
+function isPrimitiveShape(shape: SceneObject["shape"]): shape is PrimitiveShape {
+  return shape === "box" || shape === "sphere" || shape === "cylinder";
+}
+
 function ensureRenderHints(object: SceneObject) {
   object.render_hints ??= {};
 
-  if (object.shape) {
+  if (isPrimitiveShape(object.shape)) {
     object.render_hints.segment_count ??= DEFAULT_SEGMENTS[object.shape];
   }
 
-  if (object.asset) {
-    object.render_hints.texture_resolution ??= "high";
+  if (object.synthesis_contract) {
+    object.render_hints.bounding_box ??= object.synthesis_contract.bounding_box;
+    object.render_hints.min_parts ??= object.synthesis_contract.min_parts;
+    object.render_hints.complexity ??= object.synthesis_contract.complexity_hint;
   }
 
   if (typeof object.material.transmission === "number" && object.material.transmission > 0) {
@@ -83,7 +95,9 @@ function clamp(value: number, min: number, max: number) {
 function estimateObjectDrawCalls(object: SceneObject) {
   ensureRenderHints(object);
 
-  let drawCalls = 1;
+  let drawCalls = object.type === "synthesis_contract"
+    ? Math.max(1, object.render_hints?.min_parts ?? object.synthesis_contract?.min_parts ?? 1)
+    : 1;
 
   if (typeof object.material.transmission === "number" && object.material.transmission > 0) {
     drawCalls += 1;
@@ -105,23 +119,14 @@ function estimateObjectTriangles(object: SceneObject): number {
 
   let triangles = 0;
 
-  if (object.type === "model") {
-    // External model: estimate based on texture resolution hint as a proxy for LOD
-    const resolution = object.render_hints?.texture_resolution ?? "high";
-    triangles += resolution === "high" ? 5000 : resolution === "medium" ? 3000 : 1500;
-  }
-
-  if (object.type === "primitive" && object.shape) {
+  if (object.type === "primitive" && isPrimitiveShape(object.shape)) {
     const segments = object.render_hints?.segment_count ?? DEFAULT_SEGMENTS[object.shape];
 
     if (object.shape === "box") {
-      // A box has 6 faces × 2 triangles = 12 triangles (segments subdivide each face)
       triangles += 12 * Math.max(1, segments * segments);
     }
 
     if (object.shape === "sphere") {
-      // Three.js SphereGeometry: widthSegments × heightSegments × 2 triangles
-      // heightSegments defaults to widthSegments / 2
       const widthSeg = segments;
       const heightSeg = Math.max(2, Math.floor(segments / 2));
       triangles += widthSeg * heightSeg * 2;
@@ -133,7 +138,13 @@ function estimateObjectTriangles(object: SceneObject): number {
     }
   }
 
-  // Particles contribute quads (2 triangles each)
+  if (object.type === "synthesis_contract") {
+    const minParts = object.render_hints?.min_parts ?? object.synthesis_contract?.min_parts ?? 4;
+    const complexity = object.render_hints?.complexity ?? object.synthesis_contract?.complexity_hint ?? "medium";
+    const perPartTriangles = complexity === "high" ? 220 : complexity === "low" ? 70 : 140;
+    triangles += minParts * perPartTriangles;
+  }
+
   const particleCount = object.render_hints?.particle_count ?? 0;
   if (particleCount > 0) {
     triangles += particleCount * 2;
@@ -202,14 +213,7 @@ function createMergedLightingRig(existingLights: Light[], target: OptimizationTa
  * Matte materials with no asset reference have no textures to optimize.
  */
 function hasActualTextures(object: SceneObject): boolean {
-  // Must have an external asset to have real textures
-  if (!object.asset) {
-    return false;
-  }
-
-  // Matte materials without transmission, emissive, or envMap are unlikely to have meaningful textures
-  // but if they have an asset, the asset itself may contain textures
-  return true;
+  return Boolean(object.render_hints?.texture_resolution);
 }
 
 function optimizeLighting(scene: SceneData, target: OptimizationTarget, changes: OptimizationChange[]) {
@@ -261,7 +265,7 @@ function optimizeLighting(scene: SceneData, target: OptimizationTarget, changes:
 function optimizeGeometry(object: SceneObject, target: OptimizationTarget, changes: OptimizationChange[], fallbackLabel: string) {
   ensureRenderHints(object);
 
-  if (!object.shape) {
+  if (!isPrimitiveShape(object.shape)) {
     return;
   }
 
@@ -303,11 +307,8 @@ function optimizeParticles(object: SceneObject, target: OptimizationTarget, chan
 function optimizeTextures(object: SceneObject, target: OptimizationTarget, changes: OptimizationChange[], fallbackLabel: string) {
   ensureRenderHints(object);
 
-  // Only optimize texture resolution if the object actually has textures
   if (!hasActualTextures(object)) {
-    // If a previous step set texture_resolution on a non-textured object, flag it as no-op
     if (object.render_hints?.texture_resolution) {
-      // Clean up the misleading flag
       delete object.render_hints.texture_resolution;
     }
     return;
@@ -436,7 +437,9 @@ function flagRepeatedGeometry(scene: SceneData, changes: OptimizationChange[], f
 
   for (const object of scene.objects) {
     ensureRenderHints(object);
-    const groupKey = object.asset ? `asset:${object.asset}` : `primitive:${object.shape || "box"}`;
+    const groupKey = object.type === "synthesis_contract"
+      ? `synthesis:${object.synthesis_contract?.category ?? "unknown"}:${object.name || object.id}`
+      : `primitive:${object.shape || "box"}`;
     const group = groups.get(groupKey) ?? [];
 
     group.push(object);
@@ -452,7 +455,9 @@ function flagRepeatedGeometry(scene: SceneData, changes: OptimizationChange[], f
       object.render_hints!.instancing_recommended = true;
     });
 
-    const readableKey = groupKey.replace(/^asset:/, "").replace(/^primitive:/, "");
+    const readableKey = groupKey
+      .replace(/^primitive:/, "")
+      .replace(/^synthesis:/, "");
     changes.push({
       description: `Suggested instancing for repeated geometry group "${readableKey}" (${objects.length} objects)`,
       impact: "real",
@@ -464,16 +469,11 @@ function flagRepeatedGeometry(scene: SceneData, changes: OptimizationChange[], f
 
 function buildFurtherSuggestions(scene: SceneData, target: OptimizationTarget, lightsWereReduced: boolean) {
   const suggestions = new Set<string>();
-  const hasModelAssets = scene.objects.some((object) => Boolean(object.asset));
-  const hasGlbAssets = scene.objects.some((object) => object.asset?.endsWith(".glb"));
+  const hasSynthesizedObjects = scene.objects.some((object) => object.type === "synthesis_contract");
   const hasTransmission = scene.objects.some((object) => typeof object.material.transmission === "number" && object.material.transmission > 0);
 
-  if (hasModelAssets) {
-    suggestions.add("Use drei <Preload /> for asset warming");
-  }
-
-  if (hasGlbAssets) {
-    suggestions.add("Consider Draco compression if loading .glb files");
+  if (hasSynthesizedObjects) {
+    suggestions.add("Cache synthesized geometry per object/style/material combination to avoid repeated orchestration work");
   }
 
   if (hasTransmission && target !== "mobile") {
@@ -486,7 +486,7 @@ function buildFurtherSuggestions(scene: SceneData, target: OptimizationTarget, l
   }
 
   if (target === "mobile") {
-    suggestions.add("Prefer KTX2 or reduced texture atlases for mobile bandwidth savings");
+    suggestions.add("Prefer fewer meshes per synthesized object on mobile to trim draw calls");
   }
 
   return [...suggestions];

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
-import { resolveAssetForObject } from "./assetService.js";
+import { buildSynthesisContract } from "../lib/synthesisContract.js";
 import { getMaterial } from "./materialService.js";
-import { Material, SceneObject, Vector3 } from "../types/scene.js";
+import { Material, PrimitiveShape, SceneObject, Vector3 } from "../types/scene.js";
 import {
   CompositionPresetToken,
   LightingPresetToken,
@@ -36,22 +36,20 @@ const DEFAULT_SEGMENT_COUNT: Record<"box" | "sphere" | "cylinder", number> = {
   cylinder: 48
 };
 
-function getPrimitiveShape(name: string): "box" | "sphere" | "cylinder" {
-  const normalizedName = name.toLowerCase();
+const NATIVE_PRIMITIVES: Record<string, PrimitiveShape> = {
+  box: "box",
+  cube: "box",
+  cuboid: "box",
+  sphere: "sphere",
+  orb: "sphere",
+  globe: "sphere",
+  cylinder: "cylinder"
+};
 
-  if (normalizedName.includes("can") || normalizedName.includes("bottle")) {
-    return "cylinder";
-  }
+function getPrimitiveShape(name: string): PrimitiveShape | null {
+  const normalizedName = name.toLowerCase().trim();
 
-  if (normalizedName.includes("orb") || normalizedName.includes("sphere") || normalizedName.includes("globe")) {
-    return "sphere";
-  }
-
-  if (normalizedName.includes("ice")) {
-    return "box";
-  }
-
-  return "box";
+  return NATIVE_PRIMITIVES[normalizedName] ?? null;
 }
 
 function roundVector(values: Vector3): Vector3 {
@@ -137,36 +135,61 @@ export function createObject(
   lightingPreset: LightingPresetToken,
   composition: CompositionPresetToken,
   index: number,
-  rawStyle?: string
+  rawStyle?: string,
+  accentColor = "#00F5FF"
 ): SceneObject {
-  const { asset, confirmed } = resolveAssetForObject(name);
   const shape = getPrimitiveShape(name);
   const material = getMaterial(theme, materialPreset, lightingPreset, name, index, rawStyle);
+  const objectId = uuidv4();
+
+  if (shape) {
+    return {
+      id: objectId,
+      type: "primitive",
+      name,
+      shape,
+      position: getObjectPosition(name, index, composition),
+      rotation: getObjectRotation(name, index, composition),
+      scale: getObjectScale(name, index, composition),
+      material,
+      render_hints: createRenderHints(shape, material)
+    };
+  }
+
+  const contract = buildSynthesisContract({
+    objectId,
+    objectName: name,
+    style: rawStyle || theme,
+    materialPreset,
+    baseColor: material.color,
+    accentColor
+  });
 
   return {
-    id: uuidv4(),
-    type: asset ? "model" : "primitive",
+    id: objectId,
+    type: "synthesis_contract",
     name,
-    shape: asset && confirmed ? undefined : shape,
-    asset: asset || null,
-    asset_confirmed: asset ? confirmed : undefined,
-    fallback_strategy: asset && !confirmed ? "procedural" : undefined,
+    shape: "SYNTHESIS_REQUIRED",
+    synthesis_contract: contract,
     position: getObjectPosition(name, index, composition),
     rotation: getObjectRotation(name, index, composition),
     scale: getObjectScale(name, index, composition),
     material,
-    render_hints: createRenderHints(asset && confirmed ? undefined : shape, asset, material)
+    render_hints: {
+      ...createRenderHints(undefined, material),
+      bounding_box: contract.bounding_box,
+      min_parts: contract.min_parts,
+      complexity: contract.complexity_hint
+    }
   };
 }
 
 function createRenderHints(
-  shape: SceneObject["shape"],
-  asset: string | null,
+  shape: PrimitiveShape | undefined,
   material: Material
 ): SceneObject["render_hints"] {
   return {
     segment_count: shape ? DEFAULT_SEGMENT_COUNT[shape] : undefined,
-    texture_resolution: asset ? "high" : undefined,
     transparency_mode: typeof material.transmission === "number" && material.transmission > 0
       ? "physical"
       : "opaque"

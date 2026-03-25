@@ -8,6 +8,7 @@ import { applyAnimationTool } from "./applyAnimation.js";
 import { exportAssetTool } from "./export_asset.js";
 import { integrationHelpTool } from "./integrationHelp.js";
 import { editSceneTool } from "./editScene.js";
+import { synthesizeGeometryTool } from "./synthesizeGeometry.js";
 
 export function registerTools(server: FastMCP) {
   server.addTool(refinePromptTool);
@@ -16,7 +17,8 @@ export function registerTools(server: FastMCP) {
   server.addTool(editSceneTool);
   server.addTool(applyAnimationTool);
   server.addTool(optimizeForWebTool);
-  server.addTool(generateR3FTool)
+  server.addTool(generateR3FTool);
   server.addTool(exportAssetTool);
+  server.addTool(synthesizeGeometryTool);
   server.addTool(integrationHelpTool);
 }

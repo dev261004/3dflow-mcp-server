@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { createObject } from "./objectGenerator.js";
 import { buildAnimations } from "./animationEngine.js";
-import { Animation, Light, SceneData, SceneObject } from "../types/scene.js";
+import { Animation, ColorHint, Light, SceneData, SceneObject } from "../types/scene.js";
 import {
     BackgroundPresetToken,
     CompositionPresetToken,
@@ -10,7 +10,6 @@ import {
     ThemeToken,
     normalizeDesignTokens
 } from "../types/designTokens.js";
-import type { ColorHint } from "./promptRefiner.js";
 
 function normalizeStyleText(value?: string) {
     return typeof value === "string" ? value.toLowerCase() : "";
@@ -237,6 +236,8 @@ export function buildScene(plan: any): SceneData {
 
     const objects: SceneObject[] = [];
     const notes: string[] = [];
+    const accentColor = colorHints.find((hint: ColorHint) => hint.role === "accent")?.hex
+        ?? getAccentColor(designTokens.theme, designTokens.lighting_preset);
 
     // 🧠 Generate objects
     if (plan.objects && Array.isArray(plan.objects)) {
@@ -251,13 +252,14 @@ export function buildScene(plan: any): SceneData {
                 designTokens.lighting_preset,
                 designTokens.composition,
                 index,
-                rawStyle
+                rawStyle,
+                accentColor
             );
 
             objects.push(obj);
 
-            if (obj.asset && obj.asset_confirmed === false) {
-                notes.push(`Procedural fallback will be used for ${obj.name || obj.asset} because ${obj.asset} is not confirmed.`);
+            if (obj.synthesis_contract) {
+                notes.push("synthesis_contract_attached");
             }
         });
     }
@@ -266,13 +268,14 @@ export function buildScene(plan: any): SceneData {
     if (!plan.objects || plan.objects.length === 0) {
         objects.push(
             createObject(
-                "default_box",
+                "box",
                 designTokens.theme,
                 designTokens.material_preset,
                 designTokens.lighting_preset,
                 designTokens.composition,
                 0,
-                rawStyle
+                rawStyle,
+                accentColor
             )
         );
     }
@@ -289,6 +292,7 @@ export function buildScene(plan: any): SceneData {
             use_case: designTokens.use_case,
             style: rawStyle || designTokens.theme,
             design_tokens: designTokens,
+            color_hints: colorHints,
             created_at: new Date().toISOString()
         },
 

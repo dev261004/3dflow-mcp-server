@@ -1,0 +1,278 @@
+/** @jest-environment node */
+// @ts-nocheck
+
+const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
+const { existsSync, rmSync } = require("node:fs");
+const { join } = require("node:path");
+
+const CACHE_DIR = join(process.cwd(), ".synthesis_cache");
+
+function clearCache() {
+  if (existsSync(CACHE_DIR)) {
+    rmSync(CACHE_DIR, { recursive: true, force: true });
+  }
+}
+
+function runJson(script) {
+  const output = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+
+  return JSON.parse(output.trim());
+}
+
+function buildSceneScript({ includeSynthesized = false } = {}) {
+  return `
+    import { buildSynthesisContract } from "./dist/lib/synthesisContract.js";
+    import { handleGenerateR3FCode } from "./dist/services/r3fGenerator.js";
+
+    const contract = buildSynthesisContract({
+      objectId: "robot_1",
+      objectName: "robot",
+      style: "futuristic",
+      materialPreset: "metal_chrome",
+      baseColor: "#f6f7fb",
+      accentColor: "#00F5FF"
+    });
+
+    const scene = {
+      scene_id: "scene_1",
+      notes: ["synthesis_contract_attached"],
+      metadata: {
+        title: "Test Scene",
+        use_case: "showcase",
+        style: "futuristic",
+        design_tokens: {
+          use_case: "showcase",
+          theme: "futuristic",
+          material_preset: "metal_chrome",
+          animation: "none",
+          lighting_preset: "neon_edge",
+          background_preset: "gradient_vivid",
+          composition: "floating_showcase"
+        },
+        color_hints: [
+          {
+            name: "cyan",
+            hex: "#00F5FF",
+            role: "accent"
+          }
+        ],
+        created_at: "2026-03-25T00:00:00.000Z"
+      },
+      environment: {
+        background: {
+          type: "color",
+          value: "#07182d"
+        }
+      },
+      camera: {
+        type: "perspective",
+        position: [0, 2.1, 5.5],
+        fov: 48,
+        target: [0, 0.2, 0]
+      },
+      lighting: [
+        {
+          id: "light_1",
+          type: "ambient",
+          intensity: 0.24,
+          color: "#d9ecff"
+        }
+      ],
+      objects: [
+        {
+          id: "robot_1",
+          type: "synthesis_contract",
+          name: "robot",
+          shape: "SYNTHESIS_REQUIRED",
+          synthesis_contract: contract,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          material: {
+            type: "metal",
+            color: "#f6f7fb",
+            metalness: 1,
+            roughness: 0.05
+          },
+          render_hints: {
+            bounding_box: contract.bounding_box,
+            min_parts: contract.min_parts,
+            complexity: contract.complexity_hint
+          }
+        }
+      ],
+      animations: []
+    };
+
+    const result = handleGenerateR3FCode(scene, {
+      framework: "nextjs",
+      typing: "typescript"${includeSynthesized ? `,
+      synthesized_components: {
+        robot_1: \`const RobotGeometry = React.forwardRef((props, ref) => (
+  <group ref={ref}>
+    <mesh>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#f6f7fb" />
+    </mesh>
+    <mesh position={[0, 0.8, 0]}>
+      <sphereGeometry args={[0.35, 16, 16]} />
+      <meshStandardMaterial color="#00F5FF" emissive="#00F5FF" emissiveIntensity={3} />
+    </mesh>
+    <mesh position={[-0.4, 0.2, 0]}>
+      <cylinderGeometry args={[0.08, 0.08, 0.8, 12]} />
+      <meshStandardMaterial color="#f6f7fb" />
+    </mesh>
+    <mesh position={[0.4, 0.2, 0]}>
+      <cylinderGeometry args={[0.08, 0.08, 0.8, 12]} />
+      <meshStandardMaterial color="#f6f7fb" />
+    </mesh>
+    <mesh position={[-0.2, -0.9, 0]}>
+      <cylinderGeometry args={[0.1, 0.1, 0.9, 12]} />
+      <meshStandardMaterial color="#f6f7fb" />
+    </mesh>
+    <mesh position={[0.2, -0.9, 0]}>
+      <cylinderGeometry args={[0.1, 0.1, 0.9, 12]} />
+      <meshStandardMaterial color="#f6f7fb" />
+    </mesh>
+    <mesh position={[0, 0.35, 0.55]}>
+      <ringGeometry args={[0.08, 0.14, 16]} />
+      <meshStandardMaterial color="#00F5FF" emissive="#00F5FF" emissiveIntensity={2.5} />
+    </mesh>
+  </group>
+));\`
+      }` : ""}
+    });
+
+    console.log(JSON.stringify(result));
+  `;
+}
+
+beforeEach(() => {
+  clearCache();
+});
+
+test("detectCategory maps robot to character", () => {
+  const result = runJson(`
+    import { detectCategory } from "./dist/lib/objectCategories.js";
+    console.log(JSON.stringify(detectCategory("robot")));
+  `);
+
+  assert.equal(result, "character");
+});
+
+test("detectCategory maps coldrink to container", () => {
+  const result = runJson(`
+    import { detectCategory } from "./dist/lib/objectCategories.js";
+    console.log(JSON.stringify(detectCategory("coldrink")));
+  `);
+
+  assert.equal(result, "container");
+});
+
+test("detectCategory falls back to unknown", () => {
+  const result = runJson(`
+    import { detectCategory } from "./dist/lib/objectCategories.js";
+    console.log(JSON.stringify(detectCategory("unknownXYZ")));
+  `);
+
+  assert.equal(result, "unknown");
+});
+
+test("buildSynthesisContract returns expected robot contract", () => {
+  const result = runJson(`
+    import { buildSynthesisContract } from "./dist/lib/synthesisContract.js";
+
+    const contract = buildSynthesisContract({
+      objectId: "robot_1",
+      objectName: "robot",
+      style: "futuristic",
+      materialPreset: "metal_chrome",
+      baseColor: "#f6f7fb",
+      accentColor: "#00F5FF"
+    });
+
+    console.log(JSON.stringify({
+      type: contract.__type,
+      bounding_box: contract.bounding_box,
+      min_parts: contract.min_parts
+    }));
+  `);
+
+  assert.equal(result.type, "SYNTHESIS_REQUIRED");
+  assert.deepEqual(result.bounding_box, [1, 2, 1]);
+  assert.equal(result.min_parts, 7);
+});
+
+test("handleGenerateR3FCode requests synthesis when components are missing", () => {
+  const result = runJson(buildSceneScript());
+
+  assert.equal(result.status, "SYNTHESIS_REQUIRED");
+  assert.equal(result.objects_needing_synthesis[0].object_name, "robot");
+});
+
+test("handleGenerateR3FCode returns success when synthesized components are provided", () => {
+  const result = runJson(buildSceneScript({ includeSynthesized: true }));
+
+  assert.equal(result.status, "SUCCESS");
+  assert.match(result.r3f_code, /RobotGeometry/);
+});
+
+test("synthesis cache stores and retrieves geometry", () => {
+  const result = runJson(`
+    import {
+      buildCacheKey,
+      getCachedGeometry,
+      setCachedGeometry
+    } from "./dist/lib/synthesisCache.js";
+
+    const key = buildCacheKey({
+      objectName: "robot",
+      style: "futuristic",
+      materialPreset: "metal_chrome",
+      accentColor: "#00F5FF"
+    });
+
+    const before = getCachedGeometry(key);
+
+    setCachedGeometry(key, {
+      jsx: "<group />",
+      object_name: "robot",
+      category: "character",
+      style: "futuristic",
+      material_preset: "metal_chrome",
+      accent_color: "#00F5FF"
+    });
+
+    const after = getCachedGeometry(key);
+    console.log(JSON.stringify({ before, after }));
+  `);
+
+  assert.equal(result.before, null);
+  assert.equal(result.after, "<group />");
+});
+
+test("synthesize_geometry tool returns a contract", () => {
+  const result = runJson(`
+    import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.js";
+    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+
+    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute({
+      object_name: "robot",
+      style: "futuristic",
+      material_preset: "metal_chrome",
+      base_color: "#f6f7fb",
+      accent_color: "#00F5FF",
+      object_id: "robot_1"
+    }));
+
+    console.log(JSON.stringify(payload));
+  `);
+
+  assert.equal(result.synthesis_contract.__type, "SYNTHESIS_REQUIRED");
+  assert.equal(result.synthesis_contract.object_name, "robot");
+  assert.equal(result.ready_to_generate, true);
+});

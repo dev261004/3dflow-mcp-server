@@ -1,25 +1,25 @@
-import { generateR3FCode, R3FTypingMode } from "./r3fGenerator.js";
+import {
+  handleGenerateR3FCode,
+  R3FFramework,
+  R3FTypingMode
+} from "./r3fGenerator.js";
 import { SceneData } from "../types/scene.js";
 
 interface ExportSceneOptions {
   typing?: R3FTypingMode;
+  framework?: R3FFramework;
+  synthesized_components?: Record<string, string>;
 }
 
 export function exportScene(scene: SceneData, format: string, options: ExportSceneOptions = {}) {
-  // 🟢 R3F EXPORT
   if (format === "r3f") {
-    const code = generateR3FCode(scene, {
-      typing: options.typing ?? "none"
+    return handleGenerateR3FCode(scene, {
+      typing: options.typing ?? "none",
+      framework: options.framework ?? "plain",
+      synthesized_components: options.synthesized_components
     });
-
-    return {
-      type: "r3f",
-      language: options.typing === "typescript" ? "tsx" : "jsx",
-      content: code
-    };
   }
 
-  // 🔵 JSON EXPORT
   if (format === "json") {
     return {
       type: "json",
@@ -27,7 +27,6 @@ export function exportScene(scene: SceneData, format: string, options: ExportSce
     };
   }
 
-  // 🟡 PREVIEW EXPORT (MVP FAKE)
   if (format === "preview") {
     return {
       type: "preview",

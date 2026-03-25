@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { generateR3FCode } from "../services/r3fGenerator.js";
+import { handleGenerateR3FCode } from "../services/r3fGenerator.js";
 import { SceneData } from "../types/scene.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
@@ -24,18 +24,18 @@ Framework support:
   parameters: z.object({
     scene_data: z.any(),
     typing: z.enum(["none", "typescript", "prop-types"]).optional(),
-    framework: z.enum(["nextjs", "vite", "plain"]).optional()
+    framework: z.enum(["nextjs", "vite", "plain"]).optional(),
+    synthesized_components: z.record(z.string(), z.string()).optional()
   }),
 
-  async execute({ scene_data, typing, framework }: any) {
+  async execute({ scene_data, typing, framework, synthesized_components }: any) {
     const normalizedScene = unwrapToolPayload<SceneData>(scene_data, "scene_data");
-    const code = generateR3FCode(normalizedScene, {
+    const result = handleGenerateR3FCode(normalizedScene, {
       typing: typing || "none",
-      framework: framework || "plain"
+      framework: framework || "plain",
+      synthesized_components
     });
 
-    return createToolResult({
-      r3f_code: code
-    });
+    return createToolResult(result);
   }
 };

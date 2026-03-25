@@ -25,13 +25,17 @@ Rules:
   parameters: z.object({
     scene_data: z.any(),
     format: z.enum(["r3f", "json", "preview"]),
-    typing: z.enum(["none", "typescript", "prop-types"]).optional()
+    typing: z.enum(["none", "typescript", "prop-types"]).optional(),
+    framework: z.enum(["nextjs", "vite", "plain"]).optional(),
+    synthesized_components: z.record(z.string(), z.string()).optional()
   }),
 
-  async execute({ scene_data, format, typing }: any) {
+  async execute({ scene_data, format, typing, framework, synthesized_components }: any) {
     const normalizedScene = unwrapToolPayload<SceneData>(scene_data, "scene_data");
     const result = exportScene(normalizedScene, format, {
-      typing: typing || "none"
+      typing: typing || "none",
+      framework: framework || "plain",
+      synthesized_components
     });
 
     return createToolResult(result);

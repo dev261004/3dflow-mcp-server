@@ -1,9 +1,17 @@
 import type { DesignTokens } from "./designTokens.js";
+import type { SynthesisContract } from "./synthesis.js";
 
 export type Vector3 = [number, number, number];
 export type AnimationAxis = "x" | "y" | "z";
 export type TextureResolution = "high" | "medium" | "low";
 export type TransparencyMode = "physical" | "approximate" | "opaque";
+export type PrimitiveShape = "box" | "sphere" | "cylinder";
+
+export interface ColorHint {
+  name: string;
+  hex: string;
+  role: "background" | "accent" | "general";
+}
 
 export interface Material {
   type: "glass" | "metal" | "matte" | "standard";
@@ -23,16 +31,17 @@ export interface RenderHints {
   texture_resolution?: TextureResolution;
   transparency_mode?: TransparencyMode;
   instancing_recommended?: boolean;
+  bounding_box?: Vector3;
+  min_parts?: number;
+  complexity?: "low" | "medium" | "high";
 }
 
 export interface SceneObject {
   id: string;
-  type: "model" | "primitive";
+  type: "primitive" | "synthesis_contract";
   name?: string;
-  shape?: "box" | "sphere" | "cylinder";
-  asset?: string | null;
-  asset_confirmed?: boolean;
-  fallback_strategy?: "procedural";
+  shape?: PrimitiveShape | "SYNTHESIS_REQUIRED";
+  synthesis_contract?: SynthesisContract;
   position: Vector3;
   rotation: Vector3;
   scale: Vector3;
@@ -80,6 +89,7 @@ export interface SceneData {
     use_case: string;
     style: string;
     design_tokens?: DesignTokens;
+    color_hints?: ColorHint[];
     created_at: string;
   };
 

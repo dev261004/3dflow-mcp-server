@@ -1,4 +1,4 @@
-import { ContentResult } from "fastmcp";
+import type { ContentResult } from "fastmcp";
 
 type JsonObject = Record<string, unknown>;
 
