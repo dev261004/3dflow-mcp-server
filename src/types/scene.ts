@@ -51,7 +51,7 @@ export interface SceneObject {
 
 export interface Light {
   id: string;
-  type: "ambient" | "spot" | "directional";
+  type: "ambient" | "spot" | "directional" | "point";
   intensity: number;
   color: string;
   position?: Vector3;
