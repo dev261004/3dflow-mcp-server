@@ -3,6 +3,7 @@ import { refinePromptTool } from "./refinePrompt.tool.js";
 import { generateScenePlanTool } from "./generateScenePlan.tool.js";
 import { generateSceneTool } from "./generateScene.tool.js";
 import { previewTool } from "./preview.tool.js";
+import { validateSceneTool } from "./validate-scene.tool.js";
 import { optimizeForWebTool } from "./optimizeForWeb.tool.js";
 import { generateR3FTool } from "./generateR3F.tool.js";
 import { applyAnimationTool } from "./applyAnimation.tool.js";
@@ -16,6 +17,7 @@ export function registerTools(server: FastMCP) {
   server.addTool(generateScenePlanTool);
   server.addTool(generateSceneTool);
   server.addTool(previewTool);
+  server.addTool(validateSceneTool);
   server.addTool(editSceneTool);
   server.addTool(applyAnimationTool);
   server.addTool(optimizeForWebTool);
