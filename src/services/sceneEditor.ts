@@ -334,7 +334,7 @@ function resolveAnimationToken(animations: Animation[]): AnimationToken {
   if (uniqueTypes.size === 1) {
     const [onlyType] = uniqueTypes;
 
-    return onlyType === "rotate" ? "rotation" : onlyType;
+    return onlyType;
   }
 
   if (uniqueTypes.size === 2 && uniqueTypes.has("float") && uniqueTypes.has("rotate")) {
@@ -347,7 +347,7 @@ function resolveAnimationToken(animations: Animation[]): AnimationToken {
     return "none";
   }
 
-  return firstType === "rotate" ? "rotation" : firstType;
+  return firstType;
 }
 
 function needsAnimationTokenWarning(animations: Animation[]) {

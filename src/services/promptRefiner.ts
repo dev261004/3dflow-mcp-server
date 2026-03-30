@@ -97,7 +97,7 @@ const ANIMATION_RULES: MatchRule<AnimationToken>[] = [
     keywords: ["floating", "float", "hover", "hovering", "levitating", "suspended"]
   },
   {
-    token: "rotation",
+    token: "rotate",
     keywords: ["rotating", "rotation", "rotate", "spinning", "spin", "turntable"]
   },
   {

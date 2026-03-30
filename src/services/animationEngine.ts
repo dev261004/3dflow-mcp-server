@@ -4,10 +4,6 @@ import { Animation, SceneObject } from "../types/scene.types.js";
 function normalizeAnimationIntent(type: string) {
   const normalized = type.toLowerCase().trim();
 
-  if (normalized === "rotation") {
-    return "rotate";
-  }
-
   if (["rotate", "float", "pulse", "bounce", "none"].includes(normalized)) {
     return normalized;
   }

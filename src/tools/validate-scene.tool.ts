@@ -75,8 +75,13 @@ function buildNextStep(
   warnings: number,
   errorCount: number,
   strict: boolean,
-  totalRulesRun: number
+  totalRulesRun: number,
+  hasUnresolvedSynthesisContracts: boolean
 ) {
+  if (hasUnresolvedSynthesisContracts) {
+    return "ERROR: Unresolved synthesis contracts detected. Call synthesize_geometry for each pending object before calling generate_r3f_code.";
+  }
+
   const strictPrefix = strict ? "[STRICT MODE] " : "";
 
   if (!is_valid) {
@@ -115,6 +120,7 @@ export function buildValidateSceneOutput(scene_data: SceneData, strict = false):
       message: result.message ?? "",
       fix_hint: result.fix_hint ?? ""
     }));
+  const hasUnresolvedSynthesisContracts = results.some((result) => result.rule_id === "O5" && result.status === "fail");
 
   return {
     validation_id: randomUUID(),
@@ -130,7 +136,14 @@ export function buildValidateSceneOutput(scene_data: SceneData, strict = false):
     },
     results,
     errors_detail,
-    next_step: buildNextStep(is_valid, warnings, errors_detail.length, strict, VALIDATOR_DEFINITIONS.length)
+    next_step: buildNextStep(
+      is_valid,
+      warnings,
+      errors_detail.length,
+      strict,
+      VALIDATOR_DEFINITIONS.length,
+      hasUnresolvedSynthesisContracts
+    )
   };
 }
 

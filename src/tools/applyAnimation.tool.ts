@@ -25,7 +25,7 @@ import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 
 export { resolveDefaultComplexity };
 
-const ANIMATION_TYPE_VALUES = ["rotate", "rotation", "float", "pulse", "bounce"] as const;
+const ANIMATION_TYPE_VALUES = ["rotate", "float", "pulse", "bounce"] as const;
 
 const APPLY_ANIMATION_DESCRIPTION = `Apply or stack animations on objects in an existing 3D scene.
 

@@ -1,6 +1,6 @@
 import type { AnimationAxis, SceneData, SceneObject } from "./scene.types.js";
 
-export type AnimationType = "rotate" | "rotation" | "float" | "pulse" | "bounce";
+export type AnimationType = "rotate" | "float" | "pulse" | "bounce";
 export type CanonicalAnimationType = "rotate" | "float" | "pulse" | "bounce";
 export type AnimationChannel = "position.y" | "rotation.y" | "scale";
 

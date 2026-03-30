@@ -248,7 +248,13 @@ export const validateObjectOverlap: Validator = (scene) => {
 export const validateSynthesisContracts: Validator = (scene) => {
   const pendingObjects = getObjects(scene)
     .map((object, index) => ({ object, label: getObjectLabel(object, index) }))
-    .filter(({ object }) => object.synthesis_contract?.__type === "SYNTHESIS_REQUIRED");
+    .filter(({ object }) => {
+      return (
+        object.type === "synthesis_contract" ||
+        object.shape === "SYNTHESIS_REQUIRED" ||
+        object.synthesis_contract?.__type === "SYNTHESIS_REQUIRED"
+      );
+    });
 
   if (pendingObjects.length === 0) {
     return null;
@@ -259,7 +265,7 @@ export const validateSynthesisContracts: Validator = (scene) => {
   return createFailure(
     "O5",
     "synthesis contracts have no orphan pending contracts",
-    "warn",
+    "error",
     `Objects have unresolved synthesis contracts: [${affected.join(", ")}]. Call synthesize_geometry before generate_r3f_code or these objects will render as empty.`,
     "Call synthesize_geometry for each pending object and pass results to generate_r3f_code via synthesized_components before generating code.",
     affected
@@ -423,7 +429,7 @@ export const VALIDATOR_DEFINITIONS: ValidatorDefinition[] = [
   {
     rule_id: "O5",
     rule_name: "synthesis contracts have no orphan pending contracts",
-    severity: "warn",
+    severity: "error",
     validate: validateSynthesisContracts
   },
   {

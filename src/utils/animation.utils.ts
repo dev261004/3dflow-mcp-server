@@ -16,7 +16,6 @@ export { resolveDefaultComplexity };
 
 export const ANIMATION_DEFAULTS: Record<AnimationType, AnimationConfig> = {
   rotate: { speed: 0.4, axis: "y", range: 6.28 },
-  rotation: { speed: 0.4, axis: "y", range: 6.28 },
   float: { speed: 0.9, axis: "y", amplitude: 0.18 },
   bounce: { speed: 1.2, axis: "y", amplitude: 0.25 },
   pulse: { speed: 1.0, scale: 1.1 }
@@ -26,7 +25,6 @@ export const CHANNEL_MAP: ChannelMap = {
   float: "position.y",
   bounce: "position.y",
   rotate: "rotation.y",
-  rotation: "rotation.y",
   pulse: "scale"
 } as const;
 
@@ -146,7 +144,7 @@ export function resolveRotateSemantics(range: number): RotateSemantics {
 }
 
 export function normalizeAnimationType(type: AnimationType): CanonicalAnimationType {
-  return type === "rotation" ? "rotate" : type;
+  return type;
 }
 
 export function materializeAnimationConfig(

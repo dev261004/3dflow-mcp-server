@@ -12,6 +12,39 @@ import {
 import { createToolResult } from "../utils/toolPayload.js";
 import { generateId } from "../utils/idGenerator.js";
 
+const synthesizeGeometrySchema = z.preprocess((value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const rawInput = value as Record<string, unknown>;
+
+  return {
+    ...rawInput,
+    __complexity_explicit: Object.prototype.hasOwnProperty.call(rawInput, "complexity")
+  };
+}, z.object({
+  object_name: z.string(),
+  style: z.enum(THEME_VALUES),
+  material_preset: z.enum(MATERIAL_PRESET_VALUES),
+  base_color: z.string().default("#e8edf8"),
+  accent_color: z.string().default("#00F5FF"),
+  object_id: z.string().optional(),
+  complexity: z
+    .enum(COMPLEXITY_TIER_VALUES)
+    .default("medium")
+    .describe(`Controls mesh part count and geometry detail.
+low    = 4-7 parts, mobile banners, thumbnails.
+medium = 10-20 parts, website sections, widgets.
+high   = 28+ parts, hero sections, showcase scenes.
+Defaults to medium if not provided. Automatically overrides to low
+when target is mobile and complexity is not explicitly set.`),
+  target: z
+    .enum(SYNTHESIS_TARGET_VALUES)
+    .optional()
+    .describe(`Optional. When "mobile" is set and complexity is not explicitly provided, complexity defaults to "low" automatically.`)
+}).passthrough());
+
 export const synthesizeGeometryTool = {
   name: "synthesize_geometry",
   description: `
@@ -36,31 +69,14 @@ with constraints calibrated to the requested complexity tier. The LLM
 generates the actual JSX and passes it to generate_r3f_code via 
 synthesized_components.
 `,
-  parameters: z.object({
-    object_name: z.string(),
-    style: z.enum(THEME_VALUES),
-    material_preset: z.enum(MATERIAL_PRESET_VALUES),
-    base_color: z.string().default("#e8edf8"),
-    accent_color: z.string().default("#00F5FF"),
-    object_id: z.string().optional(),
-    complexity: z
-      .enum(COMPLEXITY_TIER_VALUES)
-      .optional()
-      .describe(`Controls mesh part count and geometry detail.
-low    = 4-7 parts, mobile banners, thumbnails.
-medium = 10-20 parts, website sections, widgets.
-high   = 28+ parts, hero sections, showcase scenes.`),
-    target: z
-      .enum(SYNTHESIS_TARGET_VALUES)
-      .optional()
-      .describe(`Optional. When "mobile" is set and complexity is not explicitly provided, complexity defaults to "low" automatically.`)
-  }),
+  parameters: synthesizeGeometrySchema,
 
-  async execute(input: any) {
+  async execute(input: z.infer<typeof synthesizeGeometrySchema> & { __complexity_explicit?: boolean }) {
     const objectId = input.object_id ?? generateId();
     const resolvedComplexity =
-      input.complexity ??
-      (input.target === "mobile" ? resolveDefaultComplexity(undefined, undefined, input.target) : "high");
+      input.target === "mobile" && input.__complexity_explicit !== true
+        ? resolveDefaultComplexity(undefined, undefined, input.target)
+        : input.complexity;
     const contract = buildSynthesisContract({
       objectId,
       objectName: input.object_name,

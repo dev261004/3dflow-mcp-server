@@ -34,7 +34,7 @@ INPUT:
 EDIT PROMPT EXAMPLES:
 - "make it darker"          → dims ambient lighting, deepens background
 - "make the material glass" → applies glass_frost to all objects
-- "add rotation"            → appends rotation animation, keeps existing
+- "add spinning motion"     → appends rotate animation, keeps existing
 - "move the robot up"       → moves object named "robot" up by 1 unit
 - "change animation to float only" → replaces all animations with float
 - "make it neon"            → applies neon material + neon_edge lighting

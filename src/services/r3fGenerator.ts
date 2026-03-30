@@ -282,21 +282,25 @@ function buildAnimationHooks(objects: SceneObject[], animations: Animation[]) {
         const isContinuous =
           animation.resolved_semantics === "continuous" ||
           animation.config.range >= Math.PI;
+        const axis = animation.config.axis;
+        const speed = animation.config.speed;
+        const range = animation.config.range;
+        const baseRotation = getAxisBaseValue(targetObject.rotation, axis);
 
         if (isContinuous) {
           return `
   useFrame((state) => {
     if (!${refName}.current) return;
     const t = state.clock.getElapsedTime();
-    ${refName}.current.rotation.${animation.config.axis} = ${getAxisBaseValue(targetObject.rotation, animation.config.axis)} + t * ${animation.config.speed};
+    ${refName}.current.rotation.${axis} = ${baseRotation} + t * ${speed};
   });`;
         }
 
         return `
   useFrame((state) => {
     if (!${refName}.current) return;
-    const t = state.clock.getElapsedTime() * ${animation.config.speed};
-    ${refName}.current.rotation.${animation.config.axis} = ${getAxisBaseValue(targetObject.rotation, animation.config.axis)} + Math.sin(t) * ${animation.config.range};
+    const t = state.clock.getElapsedTime() * ${speed};
+    ${refName}.current.rotation.${axis} = ${baseRotation} + Math.sin(t) * ${range};
   });`;
       }
 

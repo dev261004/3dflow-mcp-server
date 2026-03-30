@@ -10,7 +10,7 @@ export const MATERIAL_PRESET_VALUES = [
   "metal_chrome",
   "plastic_gloss"
 ] as const;
-export const ANIMATION_VALUES = ["none", "rotation", "float", "bounce", "pulse"] as const;
+export const ANIMATION_VALUES = ["none", "rotate", "float", "bounce", "pulse"] as const;
 export const LIGHTING_PRESET_VALUES = [
   "studio_soft",
   "studio_dramatic",

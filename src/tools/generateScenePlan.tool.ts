@@ -276,7 +276,7 @@ Examples of VALID objects:
 Examples of INVALID objects:
 - "light", "particles", "glow", "shadow"
 
-- Animation should be simple (rotation, float, none)
+- Animation should be simple (rotate, float, none)
 Examples:
 
 User: "3D rotating sneaker ad with dark premium feel"
@@ -284,7 +284,7 @@ Output:
 {
   "objects": ["sneaker"],
   "style": "premium",
-  "animation": "rotation",
+  "animation": "rotate",
   "use_case": "advertisement"
 }
 
