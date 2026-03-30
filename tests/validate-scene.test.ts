@@ -3,6 +3,7 @@
 
 const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
+const DIST_ROOT = process.env.TEST_DIST_ROOT ?? "./dist";
 
 function runJson(script) {
   const output = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
@@ -77,8 +78,8 @@ function validateScene(scene, strict = false) {
   const payload = JSON.stringify({ scene_data: scene, strict });
 
   return runJson(`
-    import { validateSceneTool } from "./dist/tools/validate-scene.tool.js";
-    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+    import { validateSceneTool } from "${DIST_ROOT}/tools/validate-scene.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
 
     const result = unwrapToolPayload(await validateSceneTool.execute(${payload}));
     console.log(JSON.stringify(result));

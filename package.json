@@ -4,11 +4,17 @@
   "description": "MCP server for 3D scene generation for web and ads.",
   "main": "dist/server.js",
   "scripts": {
+    "check:types": "tsc -p tsconfig.json --noEmit",
+    "check:mcp": "node scripts/check-mcp-ready.mjs",
+    "test": "jest --runInBand",
+    "test:health": "node scripts/run-health-tests.mjs",
+    "prebuild": "npm run check:types && npm run check:mcp && npm run test:health",
     "build": "tsc -p tsconfig.json",
-    "dev": "nodemon --watch src --ext ts --exec \"npm run build && node dist/server.js\"",
-    "dev:http": "MCP_TRANSPORT=http nodemon --watch src --ext ts --exec \"npm run build && node dist/server.js\"",
+    "build:fast": "tsc -p tsconfig.json",
+    "dev": "nodemon --watch src --ext ts --exec \"npm run build:fast && node dist/server.js\"",
+    "dev:http": "MCP_TRANSPORT=http nodemon --watch src --ext ts --exec \"npm run build:fast && node dist/server.js\"",
     "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "health": "npm run check:types && npm run check:mcp && npm run test:health"
   },
   "keywords": [],
   "author": "",

@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
 const { existsSync, rmSync } = require("node:fs");
 const { join } = require("node:path");
+const DIST_ROOT = process.env.TEST_DIST_ROOT ?? "./dist";
 
 const CACHE_DIR = join(process.cwd(), ".synthesis_cache");
 
@@ -25,8 +26,8 @@ function runJson(script) {
 
 function buildSceneScript({ includeSynthesized = false, includeAnimation = false } = {}) {
   return `
-    import { buildSynthesisContract } from "./dist/lib/synthesisContract.js";
-    import { handleGenerateR3FCode } from "./dist/services/r3fGenerator.js";
+    import { buildSynthesisContract } from "${DIST_ROOT}/lib/synthesisContract.js";
+    import { handleGenerateR3FCode } from "${DIST_ROOT}/services/r3fGenerator.js";
 
     const contract = buildSynthesisContract({
       objectId: "robot_1",
@@ -170,7 +171,7 @@ beforeEach(() => {
 
 test("detectCategory maps robot to character", () => {
   const result = runJson(`
-    import { detectCategory } from "./dist/lib/objectCategories.js";
+    import { detectCategory } from "${DIST_ROOT}/lib/objectCategories.js";
     console.log(JSON.stringify(detectCategory("robot")));
   `);
 
@@ -179,7 +180,7 @@ test("detectCategory maps robot to character", () => {
 
 test("detectCategory maps coldrink to container", () => {
   const result = runJson(`
-    import { detectCategory } from "./dist/lib/objectCategories.js";
+    import { detectCategory } from "${DIST_ROOT}/lib/objectCategories.js";
     console.log(JSON.stringify(detectCategory("coldrink")));
   `);
 
@@ -188,7 +189,7 @@ test("detectCategory maps coldrink to container", () => {
 
 test("detectCategory falls back to unknown", () => {
   const result = runJson(`
-    import { detectCategory } from "./dist/lib/objectCategories.js";
+    import { detectCategory } from "${DIST_ROOT}/lib/objectCategories.js";
     console.log(JSON.stringify(detectCategory("unknownXYZ")));
   `);
 
@@ -197,7 +198,7 @@ test("detectCategory falls back to unknown", () => {
 
 test("buildSynthesisContract returns expected robot contract", () => {
   const result = runJson(`
-    import { buildSynthesisContract } from "./dist/lib/synthesisContract.js";
+    import { buildSynthesisContract } from "${DIST_ROOT}/lib/synthesisContract.js";
 
     const contract = buildSynthesisContract({
       objectId: "robot_1",
@@ -249,7 +250,7 @@ test("synthesis cache stores and retrieves geometry", () => {
       buildCacheKey,
       getCachedGeometry,
       setCachedGeometry
-    } from "./dist/lib/synthesisCache.js";
+    } from "${DIST_ROOT}/lib/synthesisCache.js";
 
     const key = buildCacheKey({
       objectName: "robot",
@@ -279,8 +280,8 @@ test("synthesis cache stores and retrieves geometry", () => {
 
 test("synthesize_geometry tool returns a contract", () => {
   const result = runJson(`
-    import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.tool.js";
-    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+    import { synthesizeGeometryTool } from "${DIST_ROOT}/tools/synthesizeGeometry.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
 
     const input = synthesizeGeometryTool.parameters.parse({
       object_name: "robot",
@@ -303,8 +304,8 @@ test("synthesize_geometry tool returns a contract", () => {
 
 test("generate_scene_plan treats mixed style cues as a recommendation instead of a warning", () => {
   const result = runJson(`
-    import { generateScenePlanTool } from "./dist/tools/generateScenePlan.tool.js";
-    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+    import { generateScenePlanTool } from "${DIST_ROOT}/tools/generateScenePlan.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
 
     const payload = unwrapToolPayload(await generateScenePlanTool.execute({
       refined_prompt: "3D robot showcase with futuristic, sleek, high-tech, premium dark styling",
@@ -334,8 +335,8 @@ test("generate_scene_plan treats mixed style cues as a recommendation instead of
 
 test("optimize_for_web tolerates objects without material definitions", () => {
   const result = runJson(`
-    import { optimizeForWebTool } from "./dist/tools/optimizeForWeb.tool.js";
-    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+    import { optimizeForWebTool } from "${DIST_ROOT}/tools/optimizeForWeb.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
 
     const payload = unwrapToolPayload(await optimizeForWebTool.execute({
       scene_data: {

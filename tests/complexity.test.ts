@@ -3,6 +3,7 @@
 
 const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
+const DIST_ROOT = process.env.TEST_DIST_ROOT ?? "./dist";
 
 function runJson(script) {
   const output = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
@@ -15,7 +16,7 @@ function runJson(script) {
 
 test("resolveDefaultComplexity covers the expected mapping combinations", () => {
   const result = runJson(`
-    import { resolveDefaultComplexity } from "./dist/lib/complexity.profiles.js";
+    import { resolveDefaultComplexity } from "${DIST_ROOT}/lib/complexity.profiles.js";
 
     console.log(JSON.stringify({
       advertisement_hero: resolveDefaultComplexity("advertisement", "hero_centered"),
@@ -43,7 +44,7 @@ test("resolveDefaultComplexity covers the expected mapping combinations", () => 
 
 test("complexity profiles shape the synthesis contract as expected", () => {
   const result = runJson(`
-    import { buildSynthesisContract } from "./dist/lib/synthesisContract.js";
+    import { buildSynthesisContract } from "${DIST_ROOT}/lib/synthesisContract.js";
 
     const low = buildSynthesisContract({
       objectId: "robot_low",
@@ -93,8 +94,8 @@ test("complexity profiles shape the synthesis contract as expected", () => {
 
 test('synthesize_geometry resolves target "mobile" to low complexity when complexity is omitted', () => {
   const result = runJson(`
-    import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.tool.js";
-    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+    import { synthesizeGeometryTool } from "${DIST_ROOT}/tools/synthesizeGeometry.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
 
     const input = synthesizeGeometryTool.parameters.parse({
       object_name: "robot",
@@ -116,8 +117,8 @@ test('synthesize_geometry resolves target "mobile" to low complexity when comple
 
 test('synthesize_geometry defaults omitted complexity to "medium" for non-mobile targets', () => {
   const result = runJson(`
-    import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.tool.js";
-    import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
+    import { synthesizeGeometryTool } from "${DIST_ROOT}/tools/synthesizeGeometry.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
 
     const input = synthesizeGeometryTool.parameters.parse({
       object_name: "robot",

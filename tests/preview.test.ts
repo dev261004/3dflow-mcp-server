@@ -3,6 +3,7 @@
 
 const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
+const DIST_ROOT = process.env.TEST_DIST_ROOT ?? "./dist";
 
 function runJson(script) {
   const output = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
@@ -15,7 +16,7 @@ function runJson(script) {
 
 function buildPreviewScript() {
   return `
-    import { buildPreviewResult } from "./dist/tools/preview.tool.js";
+    import { buildPreviewResult } from "${DIST_ROOT}/tools/preview.tool.js";
 
     const scene = {
       scene_id: "scene_preview_mock",
