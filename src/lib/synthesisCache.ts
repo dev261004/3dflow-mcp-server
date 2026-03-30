@@ -1,9 +1,16 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
-const CACHE_DIR = join(process.cwd(), ".synthesis_cache");
+
+import { fileURLToPath } from "node:url";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CACHE_DIR = join(__dirname, "..", ".synthesis_cache");
 const CACHE_FILE = join(CACHE_DIR, "geometry_cache.json");
+
+console.log("[synthesisCache] CACHE_DIR resolved to:", CACHE_DIR);
+console.log("[synthesisCache] CACHE_FILE resolved to:", CACHE_FILE);
+console.log("[synthesisCache] cwd is:", process.cwd());
 
 export interface CacheEntry {
   jsx: string;
@@ -31,11 +38,15 @@ function loadCache(): CacheStore {
 }
 
 function saveCache(store: CacheStore): void {
-  if (!existsSync(CACHE_DIR)) {
-    mkdirSync(CACHE_DIR, { recursive: true });
+  try {
+    if (!existsSync(CACHE_DIR)) {
+      mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    writeFileSync(CACHE_FILE, JSON.stringify(store, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[synthesisCache] Failed to write cache:", err);
+    // Don't throw — cache failure should never crash the MCP server
   }
-
-  writeFileSync(CACHE_FILE, JSON.stringify(store, null, 2), "utf-8");
 }
 
 export function buildCacheKey(params: {
@@ -71,6 +82,7 @@ export function setCachedGeometry(
   key: string,
   entry: Omit<CacheEntry, "hit_count" | "created_at">
 ): void {
+  console.log("[synthesisCache] setCachedGeometry called:", key, entry.object_name);
   const store = loadCache();
 
   store[key] = {
@@ -80,6 +92,7 @@ export function setCachedGeometry(
   };
 
   saveCache(store);
+  console.log("[synthesisCache] saved to:", CACHE_FILE);
 }
 
 export function getCacheStats(): {
