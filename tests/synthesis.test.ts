@@ -236,8 +236,11 @@ test("handleGenerateR3FCode returns success when synthesized components are prov
 
   assert.equal(result.status, "SUCCESS");
   assert.match(result.r3f_code, /RobotGeometry/);
-  assert.match(result.r3f_code, /const RobotGeometry = React\.forwardRef\(\(props, ref\) => \(\s*<group ref=\{ref\} \{\.\.\.props\}>/s);
-  assert.match(result.r3f_code, /<RobotGeometry ref=\{primaryRef\} position=\{\[0,0,0\]\} rotation=\{\[0,0,0\]\} scale=\{\[1,1,1\]\} \/>/);
+  assert.match(result.r3f_code, /const RobotGeometry = React\.forwardRef\(\(props, ref\) => \(\s*<group ref=\{ref\}>/s);
+  assert.match(result.r3f_code, /RobotGeometry\.displayName = "RobotGeometry";/);
+  assert.match(result.r3f_code, /const robotRef = useRef<ObjectRef \| null>\(null\);/);
+  assert.match(result.r3f_code, /if \(!robotRef\.current\) return;/);
+  assert.match(result.r3f_code, /<RobotGeometry ref=\{robotRef\} position=\{\[0,0,0\]\} rotation=\{\[0,0,0\]\} scale=\{\[1,1,1\]\} \/>/);
 });
 
 test("synthesis cache stores and retrieves geometry", () => {
@@ -279,21 +282,22 @@ test("synthesize_geometry tool returns a contract", () => {
     import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.tool.js";
     import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
 
-    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute({
+    const input = synthesizeGeometryTool.parameters.parse({
       object_name: "robot",
       style: "futuristic",
       material_preset: "metal_chrome",
       base_color: "#f6f7fb",
       accent_color: "#00F5FF",
       object_id: "robot_1"
-    }));
+    });
+    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute(input));
 
     console.log(JSON.stringify(payload));
   `);
 
   assert.equal(result.synthesis_contract.__type, "SYNTHESIS_REQUIRED");
   assert.equal(result.synthesis_contract.object_name, "robot");
-  assert.equal(result.synthesis_contract.complexity_tier, "high");
+  assert.equal(result.synthesis_contract.complexity_tier, "medium");
   assert.equal(result.ready_to_generate, true);
 });
 

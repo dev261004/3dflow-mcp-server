@@ -96,7 +96,7 @@ test('synthesize_geometry resolves target "mobile" to low complexity when comple
     import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.tool.js";
     import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
 
-    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute({
+    const input = synthesizeGeometryTool.parameters.parse({
       object_name: "robot",
       style: "futuristic",
       material_preset: "metal_chrome",
@@ -104,7 +104,8 @@ test('synthesize_geometry resolves target "mobile" to low complexity when comple
       accent_color: "#00F5FF",
       object_id: "robot_mobile",
       target: "mobile"
-    }));
+    });
+    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute(input));
 
     console.log(JSON.stringify(payload));
   `);
@@ -113,23 +114,24 @@ test('synthesize_geometry resolves target "mobile" to low complexity when comple
   assert.equal(result.synthesis_contract.min_parts, 4);
 });
 
-test('synthesize_geometry keeps old calls backward compatible by defaulting omitted complexity to "high"', () => {
+test('synthesize_geometry defaults omitted complexity to "medium" for non-mobile targets', () => {
   const result = runJson(`
     import { synthesizeGeometryTool } from "./dist/tools/synthesizeGeometry.tool.js";
     import { unwrapToolPayload } from "./dist/utils/toolPayload.js";
 
-    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute({
+    const input = synthesizeGeometryTool.parameters.parse({
       object_name: "robot",
       style: "futuristic",
       material_preset: "metal_chrome",
       base_color: "#f6f7fb",
       accent_color: "#00F5FF",
       object_id: "robot_default"
-    }));
+    });
+    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute(input));
 
     console.log(JSON.stringify(payload));
   `);
 
-  assert.equal(result.synthesis_contract.complexity_tier, "high");
-  assert.equal(result.synthesis_contract.min_parts, 28);
+  assert.equal(result.synthesis_contract.complexity_tier, "medium");
+  assert.equal(result.synthesis_contract.min_parts, 10);
 });
