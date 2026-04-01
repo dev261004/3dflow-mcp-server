@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { FastMCP } from "fastmcp";
-import { detectCategory, normalizeObjectCategory } from "../lib/objectCategories.js";
+import {
+  detectCategory,
+  getBoundingBox,
+  normalizeObjectCategory
+} from "../lib/objectCategories.js";
 import type { SceneData, Vector3 } from "../types/scene.types.js";
 import { createToolResult, unwrapToolPayload } from "../utils/toolPayload.js";
 import type {
@@ -62,11 +66,19 @@ type ShapeSpec =
       kind: "rect";
       width: number;
       height: number;
+      rx?: number;
     }
   | {
       kind: "ellipse";
       rx: number;
       ry: number;
+    }
+  | {
+      kind: "ring";
+      rx: number;
+      ry: number;
+      innerRx: number;
+      innerRy: number;
     }
   | {
       kind: "circle";
@@ -189,6 +201,30 @@ function getObjectLabel(object: PreviewSceneData["objects"][number]) {
   return candidate;
 }
 
+function getMetadataString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function getSceneTitle(sceneData: PreviewSceneData) {
+  return getMetadataString(sceneData.metadata?.title) ?? "Untitled Scene";
+}
+
+function getSceneUseCase(sceneData: PreviewSceneData) {
+  return (
+    getMetadataString(sceneData.metadata?.use_case) ??
+    getMetadataString(sceneData.metadata?.design_tokens?.use_case) ??
+    "general"
+  );
+}
+
+function getSceneStyle(sceneData: PreviewSceneData) {
+  return (
+    getMetadataString(sceneData.metadata?.style) ??
+    getMetadataString(sceneData.metadata?.design_tokens?.theme) ??
+    "minimal"
+  );
+}
+
 function hasPendingSynthesis(object: PreviewSceneData["objects"][number]) {
   return (
     object.type === "synthesis_contract" ||
@@ -254,7 +290,9 @@ function getObjectBoundingBox(object: PreviewSceneData["objects"][number]) {
     return [candidate[0], candidate[1], candidate[2]] as [number, number, number];
   }
 
-  return [1, 1, 1] as [number, number, number];
+  const inferredCategory = getObjectCategory(object);
+
+  return getBoundingBox(inferredCategory, "medium", getObjectLabel(object));
 }
 
 function getObjectCategory(object: PreviewSceneData["objects"][number]) {
@@ -267,31 +305,79 @@ function getObjectCategory(object: PreviewSceneData["objects"][number]) {
 function getShapeSpec(object: PreviewSceneData["objects"][number]): ShapeSpec {
   const category = getObjectCategory(object);
   const [bbWidth, bbHeight, bbDepth] = getObjectBoundingBox(object);
-  const widthPx = clamp(bbWidth * 30, 18, 140);
-  const heightPx = clamp(bbHeight * 30, 10, 120);
-  const depthPx = clamp(bbDepth * 30, 10, 140);
+  const widthPx = clamp(bbWidth * 30, 20, 80);
+  const heightPx = clamp(bbHeight * 30, 14, 60);
+  const depthPx = clamp(bbDepth * 30, 20, 80);
+  const normalizedLabel = getObjectLabel(object).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-  if (category === "humanoid") {
-    return {
-      kind: "ellipse",
-      rx: Math.max(10, widthPx * 0.35),
-      ry: Math.max(18, heightPx * 0.5)
-    };
-  }
-
-  if (category === "container") {
+  if (category === "container" || category === "book") {
     return {
       kind: "rect",
-      width: Math.max(24, widthPx),
-      height: Math.max(14, Math.min(heightPx, widthPx * 0.85))
+      width: widthPx,
+      height: heightPx
     };
   }
 
   if (category === "surface") {
     return {
       kind: "rect",
-      width: Math.max(60, Math.max(widthPx, depthPx) * 1.4),
-      height: 4
+      width: clamp(Math.max(widthPx, depthPx), 20, 80),
+      height: clamp(bbHeight * 30, 4, 6)
+    };
+  }
+
+  if (category === "footwear") {
+    return {
+      kind: "rect",
+      width: clamp(Math.max(widthPx, depthPx), 24, 80),
+      height: clamp(Math.max(heightPx, 14), 14, 40),
+      rx: 6
+    };
+  }
+
+  if (category === "device" || /\bwatch\b|\bsmartwatch\b/.test(normalizedLabel)) {
+    return {
+      kind: "rect",
+      width: clamp(Math.min(Math.max(widthPx, 20), 34), 20, 34),
+      height: clamp(Math.max(heightPx, 28), 28, 60),
+      rx: 6
+    };
+  }
+
+  if (category === "vehicle") {
+    return {
+      kind: "rect",
+      width: clamp(Math.max(widthPx, depthPx), 36, 80),
+      height: clamp(Math.max(heightPx * 0.5, 18), 18, 32)
+    };
+  }
+
+  if (
+    category === "accessory" &&
+    /\bring\b|\bbracelet\b|\bbangle\b|\banklet\b|\bchoker\b|\bnecklace\b|\bearring\b/.test(normalizedLabel)
+  ) {
+    return {
+      kind: "ring",
+      rx: clamp(widthPx * 0.45, 12, 24),
+      ry: clamp(depthPx * 0.35, 9, 18),
+      innerRx: clamp(widthPx * 0.24, 6, 14),
+      innerRy: clamp(depthPx * 0.18, 4, 10)
+    };
+  }
+
+  if (category === "plant") {
+    return {
+      kind: "ellipse",
+      rx: clamp(Math.max(widthPx * 0.42, depthPx * 0.32), 12, 26),
+      ry: clamp(Math.max(heightPx * 0.3, 10), 10, 20)
+    };
+  }
+
+  if (category === "humanoid") {
+    return {
+      kind: "ellipse",
+      rx: clamp(Math.max(widthPx * 0.28, 10), 10, 24),
+      ry: clamp(Math.max(heightPx * 0.5, 18), 18, 30)
     };
   }
 
@@ -303,19 +389,20 @@ function getShapeSpec(object: PreviewSceneData["objects"][number]): ShapeSpec {
     };
   }
 
-  if (category === "vehicle") {
-    return {
-      kind: "rect",
-      width: Math.max(42, widthPx),
-      height: Math.max(16, heightPx * 0.6)
-    };
-  }
+  if (category === "apparel") {
+    if (normalizedLabel.includes("hat") || normalizedLabel.includes("cap") || normalizedLabel.includes("helmet")) {
+      return {
+        kind: "ellipse",
+        rx: clamp(widthPx * 0.4, 12, 26),
+        ry: clamp(heightPx * 0.34, 10, 20)
+      };
+    }
 
-  if (category === "device") {
     return {
       kind: "rect",
-      width: Math.max(18, widthPx),
-      height: Math.max(28, heightPx)
+      width: widthPx,
+      height: heightPx,
+      rx: 6
     };
   }
 
@@ -334,6 +421,13 @@ function clampShapeCenter(projection: Projection, shape: ShapeSpec) {
   }
 
   if (shape.kind === "ellipse") {
+    return {
+      x: clamp(projection.x, shape.rx + 2, VIEWBOX_WIDTH - shape.rx - 2),
+      y: clamp(projection.y, shape.ry + 2, VIEWBOX_HEIGHT - shape.ry - 28)
+    };
+  }
+
+  if (shape.kind === "ring") {
     return {
       x: clamp(projection.x, shape.rx + 2, VIEWBOX_WIDTH - shape.rx - 2),
       y: clamp(projection.y, shape.ry + 2, VIEWBOX_HEIGHT - shape.ry - 28)
@@ -379,9 +473,14 @@ function buildObjectWireframe(
     const x = clamp(center.x - shape.width / 2, 0, VIEWBOX_WIDTH);
     const y = clamp(center.y - shape.height / 2, 0, VIEWBOX_HEIGHT);
 
-    baseShape = `<rect x="${x}" y="${y}" width="${shape.width}" height="${shape.height}" rx="3" fill="none" ${strokeStyle} />`;
+    baseShape = `<rect x="${x}" y="${y}" width="${shape.width}" height="${shape.height}" rx="${shape.rx ?? 3}" fill="none" ${strokeStyle} />`;
   } else if (shape.kind === "ellipse") {
     baseShape = `<ellipse cx="${center.x}" cy="${center.y}" rx="${shape.rx}" ry="${shape.ry}" fill="none" ${strokeStyle} />`;
+  } else if (shape.kind === "ring") {
+    baseShape = [
+      `<ellipse cx="${center.x}" cy="${center.y}" rx="${shape.rx}" ry="${shape.ry}" fill="none" ${strokeStyle} />`,
+      `<ellipse cx="${center.x}" cy="${center.y}" rx="${shape.innerRx}" ry="${shape.innerRy}" fill="none" ${strokeStyle} />`
+    ].join("");
   } else if (shape.kind === "cluster") {
     baseShape = [
       `<circle cx="${center.x}" cy="${center.y}" r="${shape.radius}" fill="none" ${strokeStyle} />`,
@@ -464,8 +563,8 @@ function buildLegend() {
   return `
     <g data-legend="preview">
       <text x="16" y="350" fill="rgba(255,255,255,0.45)" font-size="8">${LIGHT_SYMBOL} = light source</text>
-      <text x="16" y="362" fill="rgba(255,255,255,0.45)" font-size="8">ellipse = humanoid, rect = device/container/vehicle, flat bar = surface</text>
-      <text x="16" y="374" fill="rgba(255,255,255,0.45)" font-size="8">dot cluster = particles, solid stroke = resolved, dashed stroke = pending synthesis</text>
+      <text x="16" y="362" fill="rgba(255,255,255,0.45)" font-size="8">ellipse = humanoid/plant, rect = device/container/vehicle/book, flat bar = surface</text>
+      <text x="16" y="374" fill="rgba(255,255,255,0.45)" font-size="8">dot cluster = particles, dashed stroke = pending synthesis (shape still reflects object category)</text>
     </g>
   `;
 }
@@ -473,7 +572,7 @@ function buildLegend() {
 function generateSvgWireframe(sceneData: PreviewSceneData, view: PreviewView) {
   const backgroundColor = getBackgroundColor(sceneData);
   const accentColor = getAccentColor(sceneData);
-  const title = escapeXml(sceneData.metadata?.title || "Untitled Scene");
+  const title = escapeXml(getSceneTitle(sceneData));
   const objectWireframes = sceneData.objects.map((object) => buildObjectWireframe(object, accentColor, view)).join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}" width="${VIEWBOX_WIDTH}" height="${VIEWBOX_HEIGHT}" role="img" aria-label="Scene preview wireframe">
@@ -492,9 +591,9 @@ function buildSceneOverview(sceneData: PreviewSceneData) {
   const camera = sceneData.camera;
 
   return `SCENE OVERVIEW
-Title: ${sceneData.metadata.title}
-Use case: ${sceneData.metadata.use_case}
-Style: ${sceneData.metadata.style}
+Title: ${getSceneTitle(sceneData)}
+Use case: ${getSceneUseCase(sceneData)}
+Style: ${getSceneStyle(sceneData)}
 Background: ${backgroundDescription}
 Camera: position (${formatNumber(camera.position[0])}, ${formatNumber(camera.position[1])}, ${formatNumber(camera.position[2])}) | FOV ${camera.fov} | target (${formatNumber(camera.target[0])}, ${formatNumber(camera.target[1])}, ${formatNumber(camera.target[2])})`;
 }

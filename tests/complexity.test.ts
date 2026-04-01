@@ -163,6 +163,73 @@ test("category-aware synthesis contracts use correct hints and bounding boxes", 
   assert.doesNotMatch(result.surface.assemblyHint, /head|arm|leg/i);
 });
 
+test("expanded category detection resolves common accessories apparel and footwear", () => {
+  const result = runJson(`
+    import { detectCategory } from "${DIST_ROOT}/lib/objectCategories.js";
+    import { buildSynthesisContract } from "${DIST_ROOT}/lib/synthesisContract.js";
+
+    const wallet = buildSynthesisContract({
+      objectId: "wallet_1",
+      objectName: "wallet",
+      style: "premium",
+      materialPreset: "metal_chrome",
+      baseColor: "#f6f7fb",
+      accentColor: "#c6924c",
+      complexity: "medium"
+    });
+
+    const shoe = buildSynthesisContract({
+      objectId: "shoe_1",
+      objectName: "running shoe",
+      style: "minimal",
+      materialPreset: "plastic_gloss",
+      baseColor: "#ffffff",
+      accentColor: "#111111",
+      complexity: "medium"
+    });
+
+    const glasses = buildSynthesisContract({
+      objectId: "glasses_1",
+      objectName: "SUNGLASSES",
+      style: "premium",
+      materialPreset: "metal_brushed",
+      baseColor: "#222222",
+      accentColor: "#c6924c",
+      complexity: "medium"
+    });
+
+    console.log(JSON.stringify({
+      categories: {
+        wallet: detectCategory("wallet"),
+        shoe: detectCategory("running shoe"),
+        glasses: detectCategory("SUNGLASSES")
+      },
+      wallet: {
+        bounding_box: wallet.bounding_box,
+        assemblyHint: wallet.constraints.assemblyHint
+      },
+      shoe: {
+        bounding_box: shoe.bounding_box,
+        assemblyHint: shoe.constraints.assemblyHint
+      },
+      glasses: {
+        category: glasses.category,
+        bounding_box: glasses.bounding_box
+      }
+    }));
+  `);
+
+  assert.equal(result.categories.wallet, "container");
+  assert.equal(result.categories.shoe, "footwear");
+  assert.equal(result.categories.glasses, "apparel");
+  assert.deepEqual(result.wallet.bounding_box, [0.2, 0.01, 0.12]);
+  assert.match(result.wallet.assemblyHint, /card slot|fold crease|snap/i);
+  assert.deepEqual(result.shoe.bounding_box, [0.3, 0.12, 0.1]);
+  assert.match(result.shoe.assemblyHint, /sole|midsole|toe cap|eyelets/i);
+  assert.equal(result.glasses.category, "apparel");
+  assert.deepEqual(result.glasses.bounding_box, [0.16, 0.05, 0.06]);
+});
+
 test('synthesize_geometry resolves target "mobile" to low complexity when complexity is omitted', () => {
   const result = runJson(`
     import { synthesizeGeometryTool } from "${DIST_ROOT}/tools/synthesizeGeometry.tool.js";

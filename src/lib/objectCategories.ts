@@ -6,9 +6,14 @@ export type ObjectCategory =
   | "vehicle"
   | "device"
   | "container"
+  | "accessory"
   | "footwear"
+  | "apparel"
   | "furniture"
+  | "book"
   | "food"
+  | "plant"
+  | "tool"
   | "organic"
   | "structure"
   | "surface"
@@ -32,6 +37,39 @@ type CategoryProfile = {
   assemblyHints: Record<ComplexityTier, string>;
 };
 
+type KeywordEntry = {
+  category: NormalizedCategory;
+  keyword: string;
+};
+
+type ObjectVariantProfile = KeywordEntry & {
+  bbox: [number, number, number];
+  assemblyHint: string;
+};
+
+const UNKNOWN_ASSEMBLY_HINT =
+  "Build a detailed object using the listed geometry primitives. Identify natural sub-components (top, bottom, sides, handles, openings, decorative elements) and represent each as a separate mesh with distinct material properties.";
+const CONTAINER_BAG_HINT =
+  "Main body panel, back panel, side gussets, top flap with closure, dual handles or chain strap with connectors, hardware (clasp disc, outer ring), stitching lines, corner reinforcements, base plate, stud feet, logo plate, interior zipper strip with pull, and chain attachment loops.";
+const CONTAINER_WALLET_HINT =
+  "Main body (thin flat box), two card slot panels, fold crease line, inner lining strip, snap or button closure disc, logo plate.";
+const CONTAINER_BOTTLE_HINT =
+  "Body cylinder, bottom base disc, shoulder taper, neck cylinder, cap or lid, label panel, cap thread rings.";
+const FOOTWEAR_HINT =
+  "Sole base (flat box), midsole layer, upper body shell, toe cap, heel counter, tongue panel, eyelets row, lace loops or velcro strap, insole inner panel.";
+const ACCESSORY_WATCH_HINT =
+  "Case body disc, bezel ring, watch face disc, hour/minute hands (thin cylinders), crown knob, strap (two rectangular links), buckle ring.";
+const ACCESSORY_RING_HINT =
+  "Band torus, gemstone (sphere or faceted box), prong settings (small cylinders), inner bore (inner torus), hallmark stamp (small rectangle on band).";
+const APPAREL_HAT_HINT =
+  "Crown dome (hemisphere), brim ring, sweatband inner ring, button top disc, seam lines.";
+const FURNITURE_CHAIR_HINT =
+  "Seat platform, seat cushion, back rest panel, four legs, two armrests (optional), leg cross-braces, foot pads.";
+const BOOK_HINT =
+  "Cover front (flat box), cover back (flat box), spine (thin tall box), page block (slightly thinner box), page-edge tinting strip, bookmark ribbon.";
+const DEVICE_PHONE_HINT =
+  "Screen panel, chassis body, back panel, camera module (small cylinder cluster), button strips (side), speaker grille strip, port cutout, logo disc.";
+
 const CATEGORY_PROFILES: Record<NormalizedCategory, CategoryProfile> = {
   humanoid: {
     bbox: {
@@ -49,86 +87,156 @@ const CATEGORY_PROFILES: Record<NormalizedCategory, CategoryProfile> = {
   },
   vehicle: {
     bbox: {
-      low: [1.2, 0.5, 0.6],
-      medium: [1.6, 0.7, 0.8],
-      high: [2.0, 0.9, 1.0]
+      low: [1.4, 0.6, 0.8],
+      medium: [2.0, 0.8, 1.0],
+      high: [2.4, 0.95, 1.2]
     },
     defaultComplexity: "high",
     minParts: 6,
     assemblyHints: {
-      low: "Simple box body + 4 wheel cylinders.",
-      medium: "Body shell + hood + windshield plane + 4 detailed wheels + headlights.",
-      high: "Full body with hood, roof, trunk, doors as separate panels, detailed wheel wells, 4 wheels with hubcaps, front grille, bumpers, windshield plus rear glass, side mirrors, and exhaust."
+      low: "Simple chassis shell + wheel forms + one identifying detail.",
+      medium: "Body shell + cabin volume + wheel or wing supports + front and rear detail clusters.",
+      high: "Detailed vehicle assembly with body shell, support frame, wheel or rotor elements, trim surfaces, lights, intakes, and separate accent panels."
     }
   },
   device: {
     bbox: {
-      low: [0.35, 0.7, 0.08],
-      medium: [0.45, 0.85, 0.1],
-      high: [0.6, 1.0, 0.12]
+      low: [0.075, 0.16, 0.008],
+      medium: [0.16, 0.22, 0.03],
+      high: [0.22, 0.28, 0.04]
     },
     defaultComplexity: "medium",
     minParts: 4,
     assemblyHints: {
-      low: "Simple slab body + screen inset + one hardware detail.",
-      medium: "Body shell + screen panel + bezel break + 2 hardware details such as camera, button, or speaker grille.",
-      high: "Detailed device shell with front frame, back panel, side rails, display recess, camera cluster, speaker grille, ports, button cutouts, logo plate, and accent seams."
+      low: DEVICE_PHONE_HINT,
+      medium: DEVICE_PHONE_HINT,
+      high: DEVICE_PHONE_HINT
     }
   },
   container: {
     bbox: {
-      low: [0.6, 0.5, 0.3],
-      medium: [0.8, 0.6, 0.4],
-      high: [1.0, 0.7, 0.45]
+      low: [0.4, 0.18, 0.18],
+      medium: [1.0, 0.7, 0.45],
+      high: [1.1, 0.8, 0.5]
     },
     defaultComplexity: "medium",
     minParts: 3,
     assemblyHints: {
-      low: "Build a box body with a lid or flap and one distinguishing detail such as a clasp, handle, or label.",
-      medium: "Box or cylinder body + open or close flap + handle or strap + 2 hardware details such as clasp, zipper, or studs.",
-      high: "Full bag: main body panel, back panel, side gussets, top flap with closure, dual handles or chain strap with connectors, gold hardware including clasp disc and outer ring, stitching lines, corner reinforcements, base plate, stud feet, logo plate, interior zipper strip with pull, and chain attachment loops. Minimum 28 distinct mesh parts."
+      low: "Primary container body + closure or opening + one identifying detail.",
+      medium: "Primary container body + secondary paneling + handle, cap, or closure element + 1 to 2 hardware details.",
+      high: "Detailed container assembly with body shell, support panels, openings, closure hardware, trim accents, and interior or seam details."
+    }
+  },
+  accessory: {
+    bbox: {
+      low: [0.03, 0.03, 0.03],
+      medium: [0.05, 0.02, 0.05],
+      high: [0.08, 0.03, 0.08]
+    },
+    defaultComplexity: "medium",
+    minParts: 3,
+    assemblyHints: {
+      low: ACCESSORY_RING_HINT,
+      medium: ACCESSORY_RING_HINT,
+      high: ACCESSORY_WATCH_HINT
     }
   },
   footwear: {
     bbox: {
-      low: [0.8, 0.3, 0.35],
-      medium: [1.1, 0.55, 0.42],
-      high: [1.25, 0.6, 0.5]
+      low: [0.3, 0.12, 0.1],
+      medium: [0.32, 0.14, 0.12],
+      high: [0.36, 0.16, 0.14]
     },
     defaultComplexity: "medium",
     minParts: 5,
     assemblyHints: {
-      low: "Simple sole slab + upper shell + heel block.",
-      medium: "Sole + upper body + heel counter + toe box + lace or stripe detail.",
-      high: "Layered outsole, midsole, heel counter, toe box, tongue, collar padding, lace rows, eyelets, stitched side panels, pull tab, and logo detail panels."
+      low: FOOTWEAR_HINT,
+      medium: FOOTWEAR_HINT,
+      high: FOOTWEAR_HINT
+    }
+  },
+  apparel: {
+    bbox: {
+      low: [0.22, 0.12, 0.12],
+      medium: [0.28, 0.18, 0.28],
+      high: [0.32, 0.22, 0.32]
+    },
+    defaultComplexity: "medium",
+    minParts: 4,
+    assemblyHints: {
+      low: APPAREL_HAT_HINT,
+      medium: APPAREL_HAT_HINT,
+      high: APPAREL_HAT_HINT
     }
   },
   furniture: {
     bbox: {
-      low: [1.0, 0.8, 1.0],
-      medium: [1.2, 1.1, 1.2],
-      high: [1.6, 1.4, 1.6]
+      low: [0.55, 0.9, 0.55],
+      medium: [0.9, 0.9, 0.75],
+      high: [1.2, 0.95, 0.8]
     },
     defaultComplexity: "medium",
     minParts: 5,
     assemblyHints: {
-      low: "Primary surface plus a simple support structure.",
-      medium: "Primary surface or seat + support frame + 2 detail elements such as backrest, arms, or shelf split.",
-      high: "Detailed furniture assembly with main surfaces, support frame, structural joints, secondary panels, trim accents, and hardware or seam details."
+      low: FURNITURE_CHAIR_HINT,
+      medium: FURNITURE_CHAIR_HINT,
+      high: FURNITURE_CHAIR_HINT
+    }
+  },
+  book: {
+    bbox: {
+      low: [0.22, 0.3, 0.03],
+      medium: [0.24, 0.32, 0.04],
+      high: [0.28, 0.36, 0.05]
+    },
+    defaultComplexity: "low",
+    minParts: 4,
+    assemblyHints: {
+      low: BOOK_HINT,
+      medium: BOOK_HINT,
+      high: BOOK_HINT
     }
   },
   food: {
     bbox: {
-      low: [0.6, 0.4, 0.6],
-      medium: [1.0, 0.6, 1.0],
-      high: [1.2, 0.7, 1.2]
+      low: [0.3, 0.18, 0.3],
+      medium: [0.5, 0.25, 0.5],
+      high: [0.7, 0.32, 0.7]
     },
     defaultComplexity: "low",
     minParts: 3,
     assemblyHints: {
-      low: "Primary edible shape + one color or topping layer + base element if needed.",
-      medium: "Primary form + secondary topping or wrapper layers + garnish or plate detail.",
-      high: "Detailed food silhouette with stacked layers, toppings, garnish, supporting wrapper or plate elements, and varied surface accents."
+      low: "Primary edible silhouette + one topping, wrapper, or garnish layer.",
+      medium: "Primary edible body + stacked garnish or wrapper layers + supporting plate or base.",
+      high: "Detailed food silhouette with layered fillings, garnish, surface accents, and supporting plate or wrapper elements."
+    }
+  },
+  plant: {
+    bbox: {
+      low: [0.2, 0.4, 0.2],
+      medium: [0.28, 0.55, 0.28],
+      high: [0.4, 0.8, 0.4]
+    },
+    defaultComplexity: "low",
+    minParts: 3,
+    assemblyHints: {
+      low: "Stem or trunk + one leaf or bloom volume + base or pot.",
+      medium: "Main stem + layered leaves or petals + secondary cluster forms + base or pot.",
+      high: "Detailed plant silhouette with main stem, layered leaf or petal volumes, branch accents, and secondary growth clusters."
+    }
+  },
+  tool: {
+    bbox: {
+      low: [0.015, 0.19, 0.015],
+      medium: [0.12, 0.25, 0.05],
+      high: [0.2, 0.32, 0.08]
+    },
+    defaultComplexity: "medium",
+    minParts: 3,
+    assemblyHints: {
+      low: "Primary handle shaft + one working tip or head element.",
+      medium: "Handle + grip segmentation + working tip or tool head + one accent detail.",
+      high: "Detailed tool assembly with handle, grip breaks, working head, fasteners, trim accents, and secondary functional parts."
     }
   },
   organic: {
@@ -203,16 +311,16 @@ const CATEGORY_PROFILES: Record<NormalizedCategory, CategoryProfile> = {
   },
   unknown: {
     bbox: {
-      low: [0.6, 0.6, 0.6],
-      medium: [1.0, 1.0, 1.0],
-      high: [1.2, 1.2, 1.2]
+      low: [1, 1, 1],
+      medium: [1, 1, 1],
+      high: [1, 1, 1]
     },
     defaultComplexity: "medium",
     minParts: 4,
     assemblyHints: {
-      low: "Build a recognizable 3D representation using primitive geometries. Prioritize silhouette accuracy.",
-      medium: "Build a detailed representation using primitive geometries. Add surface details and material variation.",
-      high: "Build a fully detailed representation using primitive geometries. Prioritize silhouette accuracy, material richness, and emissive accent details. Minimum 28 distinct mesh parts."
+      low: UNKNOWN_ASSEMBLY_HINT,
+      medium: UNKNOWN_ASSEMBLY_HINT,
+      high: UNKNOWN_ASSEMBLY_HINT
     }
   }
 };
@@ -236,40 +344,266 @@ const CATEGORY_KEYWORDS: Array<{ category: NormalizedCategory; keywords: string[
   },
   {
     category: "vehicle",
-    keywords: ["car", "spaceship", "drone", "truck", "bike", "boat", "ship", "rocket", "aircraft", "ufo", "helicopter"]
+    keywords: ["motorcycle", "bicycle", "scooter", "spaceship", "helicopter", "car", "truck", "bike", "bus", "train", "plane", "boat", "ship", "drone", "rocket", "aircraft", "ufo"]
   },
   {
     category: "device",
-    keywords: ["phone", "smartphone", "tablet", "laptop", "watch", "camera", "headphones", "earbuds", "console", "controller", "monitor", "keyboard"]
+    keywords: ["smartphone", "headphones", "controller", "keyboard", "monitor", "speaker", "earbuds", "charger", "laptop", "tablet", "camera", "remote", "console", "phone", "mouse", "tv", "watch"]
   },
   {
     category: "container",
-    keywords: ["bottle", "can", "cup", "jar", "box", "bag", "handbag", "purse", "tote", "vase", "flask", "mug", "tumbler", "coldrink", "soda"]
+    keywords: ["cardholder", "briefcase", "backpack", "handbag", "suitcase", "coldrink", "billfold", "thermos", "satchel", "wallet", "bottle", "basket", "bucket", "clutch", "pouch", "crate", "flask", "trunk", "purse", "luggage", "tumbler", "mug", "bag", "box", "bowl", "cup", "jar", "can", "tin", "pot", "vase", "tote"]
+  },
+  {
+    category: "accessory",
+    keywords: ["smartwatch", "bracelet", "cufflink", "tie clip", "hair clip", "bag clip", "necklace", "earring", "brooch", "bangle", "pendant", "choker", "anklet", "charm", "watch", "ring", "pin"]
   },
   {
     category: "footwear",
-    keywords: ["shoe", "sneaker", "boot", "sandal", "heel", "trainer"]
+    keywords: ["flip flop", "sneaker", "slipper", "loafer", "oxford", "trainer", "sandal", "pump", "wedge", "mule", "clog", "shoe", "boot", "heel"]
+  },
+  {
+    category: "apparel",
+    keywords: ["sunglasses", "glasses", "goggles", "bowtie", "helmet", "beanie", "scarf", "mitten", "beret", "glove", "belt", "mask", "sock", "hat", "cap", "tie"]
   },
   {
     category: "furniture",
-    keywords: ["chair", "table", "sofa", "desk", "shelf", "lamp", "couch", "bench"]
+    keywords: ["wardrobe", "cabinet", "dresser", "mattress", "cushion", "pillow", "bench", "chair", "couch", "stool", "table", "desk", "shelf", "sofa", "bed"]
+  },
+  {
+    category: "book",
+    keywords: ["notebook", "magazine", "catalogue", "journal", "manual", "comic", "diary", "book"]
   },
   {
     category: "food",
-    keywords: ["apple", "burger", "pizza", "cake", "fruit", "bread", "donut", "sandwich"]
+    keywords: ["croissant", "sandwich", "burger", "coffee", "donut", "sushi", "pizza", "apple", "cake", "fruit", "bread", "tea"]
+  },
+  {
+    category: "plant",
+    keywords: ["succulent", "cactus", "branch", "flower", "plant", "tree", "leaf"]
+  },
+  {
+    category: "tool",
+    keywords: ["screwdriver", "scissors", "hammer", "wrench", "pliers", "pencil", "brush", "knife", "drill", "saw", "pen"]
   },
   {
     category: "organic",
-    keywords: ["plant", "tree", "flower", "leaf", "crystal", "gem", "rock", "coral"]
+    keywords: ["crystal", "coral", "rock", "gem"]
   },
   {
     category: "structure",
-    keywords: ["building", "tower", "arch", "bridge", "house", "monument"]
+    keywords: ["building", "monument", "bridge", "tower", "house", "arch"]
   }
 ];
 
+const OBJECT_VARIANTS: ObjectVariantProfile[] = [
+  ...[
+    "bag",
+    "handbag",
+    "purse",
+    "tote",
+    "backpack",
+    "satchel",
+    "pouch",
+    "clutch",
+    "briefcase",
+    "luggage",
+    "suitcase",
+    "trunk"
+  ].map((keyword) => ({
+    category: "container" as const,
+    keyword,
+    bbox: [1.0, 0.7, 0.45] as [number, number, number],
+    assemblyHint: CONTAINER_BAG_HINT
+  })),
+  ...["wallet", "billfold", "cardholder"].map((keyword) => ({
+    category: "container" as const,
+    keyword,
+    bbox: [0.2, 0.01, 0.12] as [number, number, number],
+    assemblyHint: CONTAINER_WALLET_HINT
+  })),
+  ...["bottle", "jar", "can", "tin", "flask", "thermos", "vase", "pot"].map((keyword) => ({
+    category: "container" as const,
+    keyword,
+    bbox: [0.12, 0.35, 0.12] as [number, number, number],
+    assemblyHint: CONTAINER_BOTTLE_HINT
+  })),
+  ...["watch", "smartwatch"].map((keyword) => ({
+    category: "accessory" as const,
+    keyword,
+    bbox: [0.05, 0.01, 0.05] as [number, number, number],
+    assemblyHint: ACCESSORY_WATCH_HINT
+  })),
+  ...[
+    "ring",
+    "bracelet",
+    "bangle",
+    "earring",
+    "necklace",
+    "anklet",
+    "choker",
+    "brooch",
+    "pin",
+    "cufflink",
+    "tie clip",
+    "pendant",
+    "charm",
+    "hair clip",
+    "bag clip"
+  ].map((keyword) => ({
+    category: "accessory" as const,
+    keyword,
+    bbox: [0.03, 0.03, 0.03] as [number, number, number],
+    assemblyHint: ACCESSORY_RING_HINT
+  })),
+  ...[
+    "shoe",
+    "sneaker",
+    "boot",
+    "heel",
+    "sandal",
+    "slipper",
+    "loafer",
+    "oxford",
+    "trainer",
+    "pump",
+    "wedge",
+    "mule",
+    "clog",
+    "flip flop"
+  ].map((keyword) => ({
+    category: "footwear" as const,
+    keyword,
+    bbox: [0.3, 0.12, 0.1] as [number, number, number],
+    assemblyHint: FOOTWEAR_HINT
+  })),
+  ...["hat", "cap", "beanie", "beret", "helmet"].map((keyword) => ({
+    category: "apparel" as const,
+    keyword,
+    bbox: [0.28, 0.18, 0.28] as [number, number, number],
+    assemblyHint: APPAREL_HAT_HINT
+  })),
+  ...["glasses", "sunglasses", "goggles", "mask"].map((keyword) => ({
+    category: "apparel" as const,
+    keyword,
+    bbox: [0.16, 0.05, 0.06] as [number, number, number],
+    assemblyHint: APPAREL_HAT_HINT
+  })),
+  ...["chair", "stool", "bench"].map((keyword) => ({
+    category: "furniture" as const,
+    keyword,
+    bbox: [0.55, 0.9, 0.55] as [number, number, number],
+    assemblyHint: FURNITURE_CHAIR_HINT
+  })),
+  ...["table", "desk"].map((keyword) => ({
+    category: "furniture" as const,
+    keyword,
+    bbox: [1.2, 0.75, 0.7] as [number, number, number],
+    assemblyHint: FURNITURE_CHAIR_HINT
+  })),
+  ...["book", "notebook", "journal", "diary", "magazine", "comic", "manual", "catalogue"].map((keyword) => ({
+    category: "book" as const,
+    keyword,
+    bbox: [0.22, 0.3, 0.03] as [number, number, number],
+    assemblyHint: BOOK_HINT
+  })),
+  ...["phone", "smartphone"].map((keyword) => ({
+    category: "device" as const,
+    keyword,
+    bbox: [0.075, 0.16, 0.008] as [number, number, number],
+    assemblyHint: DEVICE_PHONE_HINT
+  })),
+  ...["car", "truck", "bus"].map((keyword) => ({
+    category: "vehicle" as const,
+    keyword,
+    bbox: [2.0, 0.8, 1.0] as [number, number, number],
+    assemblyHint: "Detailed vehicle assembly with body shell, cabin, wheel sets, lights, trim lines, and separate support or chassis volumes."
+  })),
+  ...["flower", "plant", "tree", "cactus", "succulent", "leaf", "branch"].map((keyword) => ({
+    category: "plant" as const,
+    keyword,
+    bbox: [0.2, 0.4, 0.2] as [number, number, number],
+    assemblyHint: "Stem or trunk, layered leaves or petals, central bud or bloom, supporting branches, and base or pot volume."
+  })),
+  ...["pen", "pencil", "brush"].map((keyword) => ({
+    category: "tool" as const,
+    keyword,
+    bbox: [0.015, 0.19, 0.015] as [number, number, number],
+    assemblyHint: "Long shaft body, tapered or functional tip, grip section, cap or ferrule, and one secondary accent piece."
+  }))
+];
+
+const NORMALIZED_OBJECT_VARIANTS = OBJECT_VARIANTS.map((entry) => ({
+  ...entry,
+  keyword: normalizeObjectName(entry.keyword)
+}));
+
+const KEYWORD_ENTRIES: KeywordEntry[] = CATEGORY_KEYWORDS.flatMap((entry) =>
+  entry.keywords.map((keyword) => ({
+    category: entry.category,
+    keyword: normalizeObjectName(keyword)
+  }))
+);
+
 function normalizeObjectName(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim();
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasKeywordBoundaryMatch(normalizedObjectName: string, keyword: string) {
+  return new RegExp(`(?:^| )${escapeRegex(keyword)}(?:$| )`).test(normalizedObjectName);
+}
+
+function findBestKeywordMatch<T extends KeywordEntry>(
+  objectName: string,
+  entries: readonly T[],
+  requireSpecificEntry = false
+) {
+  const normalized = normalizeObjectName(objectName);
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  const exactMatches = entries.filter((entry) => entry.keyword === normalized);
+
+  if (exactMatches.length > 0) {
+    return exactMatches.sort((left, right) => right.keyword.length - left.keyword.length)[0];
+  }
+
+  if (requireSpecificEntry) {
+    return undefined;
+  }
+
+  const fuzzyMatches = entries.filter((entry) => hasKeywordBoundaryMatch(normalized, entry.keyword));
+
+  if (fuzzyMatches.length === 0) {
+    return undefined;
+  }
+
+  return fuzzyMatches.sort((left, right) => right.keyword.length - left.keyword.length)[0];
+}
+
+function getSpecificObjectProfile(objectName?: string) {
+  if (!objectName) {
+    return undefined;
+  }
+
+  return findBestKeywordMatch(objectName, NORMALIZED_OBJECT_VARIANTS, false);
+}
+
+function createCategoryConfig(category: NormalizedCategory): CategoryConfig {
+  const profile = CATEGORY_PROFILES[category];
+
+  return {
+    bbox: profile.bbox.medium,
+    minParts: profile.minParts,
+    complexityHint: profile.defaultComplexity,
+    assemblyHint: profile.assemblyHints.medium
+  };
 }
 
 export function normalizeObjectCategory(category: ObjectCategory | string | undefined): NormalizedCategory {
@@ -285,18 +619,28 @@ export function normalizeObjectCategory(category: ObjectCategory | string | unde
 }
 
 export function detectCategory(objectName: string): ObjectCategory {
-  const normalized = normalizeObjectName(objectName);
+  const specificProfile = getSpecificObjectProfile(objectName);
 
-  for (const entry of CATEGORY_KEYWORDS) {
-    if (entry.keywords.some((keyword) => normalized.includes(keyword))) {
-      return entry.category;
-    }
+  if (specificProfile) {
+    return specificProfile.category;
   }
 
-  return "unknown";
+  const keywordMatch = findBestKeywordMatch(objectName, KEYWORD_ENTRIES);
+
+  return keywordMatch?.category ?? "unknown";
 }
 
-export function getBoundingBox(category: ObjectCategory | string | undefined, complexityTier: ComplexityTier) {
+export function getBoundingBox(
+  category: ObjectCategory | string | undefined,
+  complexityTier: ComplexityTier,
+  objectName?: string
+) {
+  const specificProfile = getSpecificObjectProfile(objectName);
+
+  if (specificProfile) {
+    return specificProfile.bbox;
+  }
+
   const normalizedCategory = normalizeObjectCategory(category);
   const categoryProfile = CATEGORY_PROFILES[normalizedCategory];
 
@@ -307,7 +651,17 @@ export function getCategoryComplexityHint(category: ObjectCategory | string | un
   return CATEGORY_PROFILES[normalizeObjectCategory(category)].defaultComplexity;
 }
 
-export function buildAssemblyHint(category: ObjectCategory | string | undefined, complexityTier: ComplexityTier) {
+export function buildAssemblyHint(
+  category: ObjectCategory | string | undefined,
+  complexityTier: ComplexityTier,
+  objectName?: string
+) {
+  const specificProfile = getSpecificObjectProfile(objectName);
+
+  if (specificProfile) {
+    return specificProfile.assemblyHint;
+  }
+
   const normalizedCategory = normalizeObjectCategory(category);
   const categoryProfile = CATEGORY_PROFILES[normalizedCategory];
 
@@ -315,88 +669,23 @@ export function buildAssemblyHint(category: ObjectCategory | string | undefined,
 }
 
 export const CATEGORY_MAP: Record<ObjectCategory, CategoryConfig> = {
-  character: {
-    bbox: CATEGORY_PROFILES.humanoid.bbox.medium,
-    minParts: CATEGORY_PROFILES.humanoid.minParts,
-    complexityHint: CATEGORY_PROFILES.humanoid.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.humanoid.assemblyHints.medium
-  },
-  humanoid: {
-    bbox: CATEGORY_PROFILES.humanoid.bbox.medium,
-    minParts: CATEGORY_PROFILES.humanoid.minParts,
-    complexityHint: CATEGORY_PROFILES.humanoid.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.humanoid.assemblyHints.medium
-  },
-  vehicle: {
-    bbox: CATEGORY_PROFILES.vehicle.bbox.medium,
-    minParts: CATEGORY_PROFILES.vehicle.minParts,
-    complexityHint: CATEGORY_PROFILES.vehicle.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.vehicle.assemblyHints.medium
-  },
-  device: {
-    bbox: CATEGORY_PROFILES.device.bbox.medium,
-    minParts: CATEGORY_PROFILES.device.minParts,
-    complexityHint: CATEGORY_PROFILES.device.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.device.assemblyHints.medium
-  },
-  container: {
-    bbox: CATEGORY_PROFILES.container.bbox.medium,
-    minParts: CATEGORY_PROFILES.container.minParts,
-    complexityHint: CATEGORY_PROFILES.container.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.container.assemblyHints.medium
-  },
-  footwear: {
-    bbox: CATEGORY_PROFILES.footwear.bbox.medium,
-    minParts: CATEGORY_PROFILES.footwear.minParts,
-    complexityHint: CATEGORY_PROFILES.footwear.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.footwear.assemblyHints.medium
-  },
-  furniture: {
-    bbox: CATEGORY_PROFILES.furniture.bbox.medium,
-    minParts: CATEGORY_PROFILES.furniture.minParts,
-    complexityHint: CATEGORY_PROFILES.furniture.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.furniture.assemblyHints.medium
-  },
-  food: {
-    bbox: CATEGORY_PROFILES.food.bbox.medium,
-    minParts: CATEGORY_PROFILES.food.minParts,
-    complexityHint: CATEGORY_PROFILES.food.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.food.assemblyHints.medium
-  },
-  organic: {
-    bbox: CATEGORY_PROFILES.organic.bbox.medium,
-    minParts: CATEGORY_PROFILES.organic.minParts,
-    complexityHint: CATEGORY_PROFILES.organic.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.organic.assemblyHints.medium
-  },
-  structure: {
-    bbox: CATEGORY_PROFILES.structure.bbox.medium,
-    minParts: CATEGORY_PROFILES.structure.minParts,
-    complexityHint: CATEGORY_PROFILES.structure.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.structure.assemblyHints.medium
-  },
-  surface: {
-    bbox: CATEGORY_PROFILES.surface.bbox.medium,
-    minParts: CATEGORY_PROFILES.surface.minParts,
-    complexityHint: CATEGORY_PROFILES.surface.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.surface.assemblyHints.medium
-  },
-  environment: {
-    bbox: CATEGORY_PROFILES.environment.bbox.medium,
-    minParts: CATEGORY_PROFILES.environment.minParts,
-    complexityHint: CATEGORY_PROFILES.environment.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.environment.assemblyHints.medium
-  },
-  particle_system: {
-    bbox: CATEGORY_PROFILES.particle_system.bbox.medium,
-    minParts: CATEGORY_PROFILES.particle_system.minParts,
-    complexityHint: CATEGORY_PROFILES.particle_system.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.particle_system.assemblyHints.medium
-  },
-  unknown: {
-    bbox: CATEGORY_PROFILES.unknown.bbox.medium,
-    minParts: CATEGORY_PROFILES.unknown.minParts,
-    complexityHint: CATEGORY_PROFILES.unknown.defaultComplexity,
-    assemblyHint: CATEGORY_PROFILES.unknown.assemblyHints.medium
-  }
+  character: createCategoryConfig("humanoid"),
+  humanoid: createCategoryConfig("humanoid"),
+  vehicle: createCategoryConfig("vehicle"),
+  device: createCategoryConfig("device"),
+  container: createCategoryConfig("container"),
+  accessory: createCategoryConfig("accessory"),
+  footwear: createCategoryConfig("footwear"),
+  apparel: createCategoryConfig("apparel"),
+  furniture: createCategoryConfig("furniture"),
+  book: createCategoryConfig("book"),
+  food: createCategoryConfig("food"),
+  plant: createCategoryConfig("plant"),
+  tool: createCategoryConfig("tool"),
+  organic: createCategoryConfig("organic"),
+  structure: createCategoryConfig("structure"),
+  surface: createCategoryConfig("surface"),
+  environment: createCategoryConfig("environment"),
+  particle_system: createCategoryConfig("particle_system"),
+  unknown: createCategoryConfig("unknown")
 };

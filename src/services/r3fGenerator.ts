@@ -16,6 +16,10 @@ import {
   SynthesisContract,
   SynthesisRequiredOutput
 } from "../types/synthesis.types.js";
+import {
+  ANIMATION_DEFAULTS,
+  normalizePulseConfig
+} from "../utils/animation.utils.js";
 
 export type R3FTypingMode = "none" | "typescript" | "prop-types";
 export type R3FFramework = "nextjs" | "vite" | "plain";
@@ -36,9 +40,27 @@ type SynthesizedComponentEntry = {
   definitionBlock: string;
   verified: boolean;
   warningComment?: string;
+  failureReason?: string;
 };
 
 const FALLBACK_PLACEHOLDER_COLOR = "#666666";
+const FAILED_SYNTHESIS_PLACEHOLDER_COLOR = "#ff4444";
+
+type AnimationPropertyKey =
+  | "position.x"
+  | "position.y"
+  | "position.z"
+  | "rotation.x"
+  | "rotation.y"
+  | "rotation.z"
+  | "scale";
+
+type AnimationHookGroup = {
+  object: SceneObject;
+  refName: string;
+  property: AnimationPropertyKey;
+  animations: Animation[];
+};
 
 function getSafeMaterial(material: Material | undefined | null): Material {
   return material ?? {
@@ -152,6 +174,64 @@ function getAxisBaseValue(values: number[], axis: "x" | "y" | "z") {
   }
 
   return values[2];
+}
+
+function isAnimationAxis(value: unknown): value is "x" | "y" | "z" {
+  return value === "x" || value === "y" || value === "z";
+}
+
+function getFiniteNumber(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function getAnimationTargetObject(objects: SceneObject[], animation: Animation) {
+  return objects.find((object) => {
+    return (
+      animation.target_id === object.id ||
+      animation.target === object.id ||
+      animation.target === object.name
+    );
+  });
+}
+
+function resolveAnimationAxis(animation: Animation): "x" | "y" | "z" {
+  const rawAxis = (animation.config as { axis?: unknown } | undefined)?.axis;
+
+  if (isAnimationAxis(rawAxis)) {
+    return rawAxis;
+  }
+
+  if (animation.type === "rotate") {
+    return (ANIMATION_DEFAULTS.rotate.axis ?? "y") as "x" | "y" | "z";
+  }
+
+  if (animation.type === "float") {
+    return (ANIMATION_DEFAULTS.float.axis ?? "y") as "x" | "y" | "z";
+  }
+
+  if (animation.type === "bounce") {
+    return (ANIMATION_DEFAULTS.bounce.axis ?? "y") as "x" | "y" | "z";
+  }
+
+  return "y";
+}
+
+function resolveAnimationProperty(animation: Animation): AnimationPropertyKey | null {
+  if (animation.type === "pulse") {
+    return "scale";
+  }
+
+  const axis = resolveAnimationAxis(animation);
+
+  if (animation.type === "rotate") {
+    return `rotation.${axis}`;
+  }
+
+  if (animation.type === "float" || animation.type === "bounce") {
+    return `position.${axis}`;
+  }
+
+  return null;
 }
 
 function resolveSegmentCount(object: SceneObject) {
@@ -308,127 +388,196 @@ function buildEmissiveGlowLight(object: SceneObject): string {
   return `      <pointLight position={[${x}, ${y}, ${z}]} color="${glowColor}" intensity={${intensity.toFixed(2)}} distance={3} decay={2} />`;
 }
 
+function buildContributionName(type: string, axis: "x" | "y" | "z", index: number) {
+  const suffix = axis.toUpperCase();
+
+  return index === 1 ? `${type}${suffix}` : `${type}${suffix}${index}`;
+}
+
+function buildScalarAnimationHook(
+  group: AnimationHookGroup,
+  warnings: string[]
+) {
+  const [targetProperty, axis] = group.property.split(".") as ["position" | "rotation", "x" | "y" | "z"];
+  const basePosition = getSafeVector3(group.object.position, [0, 0, 0]);
+  const baseRotation = getSafeVector3(group.object.rotation, [0, 0, 0]);
+  const baseValue = targetProperty === "position"
+    ? getAxisBaseValue(basePosition, axis)
+    : getAxisBaseValue(baseRotation, axis);
+  const contributions: Array<{ variableName: string; expression: string }> = [];
+  let floatCount = 0;
+  let bounceCount = 0;
+  let rotateCount = 0;
+
+  for (const animation of group.animations) {
+    if (animation.type === "float") {
+      floatCount += 1;
+
+      if (floatCount > 1) {
+        warnings.push(
+          `Duplicate float animations detected for '${group.object.name ?? group.object.id}' on ${group.property}. Only the first float animation will be applied.`
+        );
+        continue;
+      }
+
+      const config = animation.config as { speed?: unknown; amplitude?: unknown } | undefined;
+      const speed = getFiniteNumber(config?.speed, ANIMATION_DEFAULTS.float.speed ?? 0.9);
+      const amplitude = getFiniteNumber(config?.amplitude, ANIMATION_DEFAULTS.float.amplitude ?? 0.18);
+
+      contributions.push({
+        variableName: buildContributionName("float", axis, floatCount),
+        expression: `Math.sin(t * ${speed}) * ${amplitude}`
+      });
+      continue;
+    }
+
+    if (animation.type === "bounce") {
+      bounceCount += 1;
+      const config = animation.config as { speed?: unknown; amplitude?: unknown } | undefined;
+      const speed = getFiniteNumber(config?.speed, 1.0);
+      const amplitude = getFiniteNumber(config?.amplitude, 0.1);
+
+      contributions.push({
+        variableName: buildContributionName("bounce", axis, bounceCount),
+        expression: `Math.abs(Math.sin(t * ${speed})) * ${amplitude}`
+      });
+      continue;
+    }
+
+    if (animation.type === "rotate") {
+      rotateCount += 1;
+      const config = animation.config as { speed?: unknown; range?: unknown } | undefined;
+      const speed = getFiniteNumber(config?.speed, ANIMATION_DEFAULTS.rotate.speed ?? 0.4);
+      const range = getFiniteNumber(config?.range, ANIMATION_DEFAULTS.rotate.range ?? Math.PI);
+      const isContinuous =
+        animation.resolved_semantics === "continuous" ||
+        range >= Math.PI;
+
+      contributions.push({
+        variableName: buildContributionName("rotate", axis, rotateCount),
+        expression: isContinuous ? `t * ${speed}` : `Math.sin(t * ${speed}) * ${range}`
+      });
+    }
+  }
+
+  if (contributions.length === 0) {
+    return "";
+  }
+
+  const contributionLines = contributions
+    .map((contribution) => `    const ${contribution.variableName} = ${contribution.expression};`)
+    .join("\n");
+  const combinedExpression = contributions.map((contribution) => contribution.variableName).join(" + ");
+
+  return `
+  useFrame((state) => {
+    if (!${group.refName}.current) return;
+    const t = state.clock.getElapsedTime();
+${contributionLines}
+    ${group.refName}.current.${targetProperty}.${axis} = ${baseValue} + ${combinedExpression};
+  });`;
+}
+
+function buildPulseAnimationHook(
+  group: AnimationHookGroup,
+  warnings: string[]
+) {
+  const baseScale = getSafeVector3(group.object.scale, [1, 1, 1]);
+  let pulseAnimation: Animation | null = null;
+
+  for (const animation of group.animations) {
+    if (animation.type !== "pulse") {
+      continue;
+    }
+
+    if (!pulseAnimation) {
+      pulseAnimation = animation;
+      continue;
+    }
+
+    warnings.push(
+      `Duplicate pulse animations detected for '${group.object.name ?? group.object.id}' on scale. Only the first pulse animation will be applied.`
+    );
+  }
+
+  if (!pulseAnimation) {
+    return "";
+  }
+
+  const pulseConfig = normalizePulseConfig(
+    (pulseAnimation.config ?? {}) as {
+      speed?: number;
+      amplitude?: number;
+      scale?: number;
+      scale_range?: [number, number];
+      _derived?: {
+        scale?: number;
+        scale_range?: [number, number];
+      };
+    }
+  );
+  const [minScale, maxScale] = pulseConfig.scale_range ?? [1, pulseConfig.scale ?? 1.1];
+  const speed = pulseConfig.speed ?? ANIMATION_DEFAULTS.pulse.speed ?? 1;
+  const scaleDelta = maxScale - minScale;
+
+  return `
+  useFrame((state) => {
+    if (!${group.refName}.current) return;
+    const t = state.clock.getElapsedTime();
+    const pulseScale = ${minScale} + ((Math.sin(t * ${speed}) + 1) / 2) * ${scaleDelta};
+    ${group.refName}.current.scale.set(
+      ${baseScale[0]} * pulseScale,
+      ${baseScale[1]} * pulseScale,
+      ${baseScale[2]} * pulseScale
+    );
+  });`;
+}
+
 function buildAnimationHooks(
   objects: SceneObject[],
   animations: Animation[],
   refNameMap: Map<string, string>
 ) {
-  return animations
-    .map((animation) => {
-      const targetObject = objects.find((object) => {
-        return (
-          animation.target_id === object.id ||
-          animation.target === object.id ||
-          animation.target === object.name
-        );
+  const groups = new Map<string, AnimationHookGroup>();
+  const warnings: string[] = [];
+
+  for (const animation of animations) {
+    const targetObject = getAnimationTargetObject(objects, animation);
+    const property = resolveAnimationProperty(animation);
+
+    if (!targetObject || !property) {
+      continue;
+    }
+
+    const key = `${targetObject.id}:${property}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        object: targetObject,
+        refName: getRefNameForObject(targetObject, refNameMap),
+        property,
+        animations: []
       });
+    }
 
-      if (!targetObject) {
-        return "";
+    groups.get(key)?.animations.push(animation);
+  }
+
+  const hooks = [...groups.values()]
+    .map((group) => {
+      if (group.property === "scale") {
+        return buildPulseAnimationHook(group, warnings);
       }
 
-      const refName = getRefNameForObject(targetObject, refNameMap);
-      const basePosition = getSafeVector3(targetObject.position, [0, 0, 0]);
-      const baseRotation = getSafeVector3(targetObject.rotation, [0, 0, 0]);
-      const baseScale = getSafeVector3(targetObject.scale, [1, 1, 1]);
-
-      if (animation.type === "float" && "amplitude" in animation.config) {
-        return `
-  useFrame((state) => {
-    if (!${refName}.current) return;
-    const t = state.clock.getElapsedTime() * ${animation.config.speed};
-    ${refName}.current.position.${animation.config.axis} = ${getAxisBaseValue(basePosition, animation.config.axis)} + Math.sin(t) * ${animation.config.amplitude};
-  });`;
-      }
-
-      if (animation.type === "rotate" && "range" in animation.config) {
-        const isContinuous =
-          animation.resolved_semantics === "continuous" ||
-          animation.config.range >= Math.PI;
-        const axis = animation.config.axis;
-        const speed = animation.config.speed;
-        const range = animation.config.range;
-        const baseRotationValue = getAxisBaseValue(baseRotation, axis);
-
-        if (isContinuous) {
-          return `
-  useFrame((state) => {
-    if (!${refName}.current) return;
-    const t = state.clock.getElapsedTime();
-    ${refName}.current.rotation.${axis} = ${baseRotationValue} + t * ${speed};
-  });`;
-        }
-
-        return `
-  useFrame((state) => {
-    if (!${refName}.current) return;
-    const t = state.clock.getElapsedTime() * ${speed};
-    ${refName}.current.rotation.${axis} = ${baseRotationValue} + Math.sin(t) * ${range};
-  });`;
-      }
-
-      if (animation.type === "bounce" && "amplitude" in animation.config) {
-        return `
-  useFrame((state) => {
-    if (!${refName}.current) return;
-    const t = state.clock.getElapsedTime() * ${animation.config.speed};
-    ${refName}.current.position.${animation.config.axis} = ${getAxisBaseValue(basePosition, animation.config.axis)} + Math.abs(Math.sin(t)) * ${animation.config.amplitude};
-  });`;
-      }
-
-      if (animation.type === "pulse" && ("scale_range" in animation.config || "_derived" in animation.config)) {
-        const pulseConfig = animation.config as {
-          scale_range?: [number, number];
-          _derived?: {
-            scale_range?: [number, number];
-          };
-        };
-        const resolvedScaleRange =
-          pulseConfig._derived?.scale_range ||
-          pulseConfig.scale_range;
-
-        if (!resolvedScaleRange) {
-          return "";
-        }
-
-        const [minScale, maxScale] = resolvedScaleRange;
-        const scaleDelta = maxScale - minScale;
-
-        return `
-  useFrame((state) => {
-    if (!${refName}.current) return;
-    const t = state.clock.getElapsedTime() * ${animation.config.speed};
-    const pulseScale = ${minScale} + ((Math.sin(t) + 1) / 2) * ${scaleDelta};
-    ${refName}.current.scale.set(
-      ${baseScale[0]} * pulseScale,
-      ${baseScale[1]} * pulseScale,
-      ${baseScale[2]} * pulseScale
-    );
-  });`;
-      }
-
-      if (animation.type === "pulse" && "scale" in animation.config) {
-        const maxScale = animation.config.scale ?? 1.1;
-        const minScale = 1;
-        const scaleDelta = maxScale - minScale;
-
-        return `
-  useFrame((state) => {
-    if (!${refName}.current) return;
-    const t = state.clock.getElapsedTime() * ${animation.config.speed};
-    const pulseScale = ${minScale} + ((Math.sin(t) + 1) / 2) * ${scaleDelta};
-    ${refName}.current.scale.set(
-      ${baseScale[0]} * pulseScale,
-      ${baseScale[1]} * pulseScale,
-      ${baseScale[2]} * pulseScale
-    );
-  });`;
-      }
-
-      return "";
+      return buildScalarAnimationHook(group, warnings);
     })
     .filter(Boolean)
     .join("\n\n");
+
+  return {
+    hooks,
+    warnings
+  };
 }
 
 function buildLightingJsx(scene: SceneData) {
@@ -516,26 +665,39 @@ function buildSynthesizedComponentEntries(
   refNameMap: Map<string, string>
 ) {
   const entries: SynthesizedComponentEntry[] = [];
+  const warningComments: string[] = [];
   const warnings: string[] = [];
 
   for (const [objectId, jsxString] of Object.entries(synthesizedComponents)) {
     const object = scene.objects.find((entry) => entry.id === objectId);
 
     if (!object) {
-      warnings.push(`// Warning: synthesized component [${objectId}] has no matching object in scene_data; skipped.`);
+      warningComments.push(`// Warning: synthesized component [${objectId}] has no matching object in scene_data; skipped.`);
+      warnings.push(`Component with id '${objectId}' has no matching object in scene_data and was skipped.`);
       continue;
     }
 
-    const trimmed = jsxString.trim();
+    const trimmed = typeof jsxString === "string" ? jsxString.trim() : "";
     const extractedComponentName = extractForwardRefComponentName(trimmed);
     const componentName = extractedComponentName ?? `${toPascalCase(object.name ?? object.id)}Geometry`;
     const verified = Boolean(extractedComponentName);
+    const failureReason = verified
+      ? undefined
+      : trimmed
+        ? "Expected a top-level React.forwardRef component declaration."
+        : "Component payload was empty.";
     const definitionBody = verified
       ? ensureComponentDisplayName(trimmed, componentName)
-      : `// Warning: synthesized component [${objectId}] does not define a top-level React.forwardRef const component. Placeholder geometry will be rendered for this object.`;
+      : `// Warning: synthesized component [${objectId}] failed verification. Placeholder geometry will be rendered for this object.`;
     const warningComment = verified
       ? undefined
       : `// Warning: synthesized component [${objectId}] could not be verified and was replaced with a placeholder mesh.`;
+
+    if (failureReason) {
+      warnings.push(
+        `Component '${object.name ?? object.id}' (id: ${objectId}) failed verification: ${failureReason} Rendered as placeholder.`
+      );
+    }
 
     entries.push({
       objectId,
@@ -544,13 +706,15 @@ function buildSynthesizedComponentEntries(
       refName: getRefNameForObject(object, refNameMap),
       definitionBlock: `// Auto-synthesized geometry for: ${object.name ?? object.id}\n${definitionBody}`,
       verified,
-      warningComment
+      warningComment,
+      failureReason
     });
   }
 
   return {
     entries,
-    warningComments: warnings,
+    warningComments,
+    warnings,
     entryByObjectId: new Map(entries.map((entry) => [entry.objectId, entry]))
   };
 }
@@ -591,7 +755,7 @@ function buildPlaceholderObjectBlock(object: SceneObject, refName: string | null
     `      {/* ${comment} */}`,
     `      <mesh ${refProp}${position} ${rotation} ${scale}>`,
     `        <boxGeometry args={[${width}, ${height}, ${depth}]} />`,
-    `        <meshStandardMaterial color="${FALLBACK_PLACEHOLDER_COLOR}" wireframe />`,
+    `        <meshStandardMaterial color="${FAILED_SYNTHESIS_PLACEHOLDER_COLOR}" wireframe />`,
     "      </mesh>"
   ].join("\n");
 }
@@ -682,12 +846,17 @@ function buildImports(
   hasAnimations: boolean,
   hasTransmission: boolean,
   hasRefs: boolean,
-  typing: R3FTypingMode
+  typing: R3FTypingMode,
+  hasRuntimeWarnings: boolean
 ) {
   const reactImports = ["Suspense"];
 
   if (hasRefs) {
     reactImports.push("useRef");
+  }
+
+  if (hasRuntimeWarnings) {
+    reactImports.push("useEffect");
   }
 
   const fiberImports = ["Canvas"];
@@ -711,6 +880,20 @@ function buildImports(
   }
 
   return importLines.join("\n");
+}
+
+function buildRuntimeWarningEffect(warnings: string[]) {
+  if (warnings.length === 0) {
+    return "";
+  }
+
+  const lines = warnings
+    .map((warning) => `    console.warn(${JSON.stringify(warning)});`)
+    .join("\n");
+
+  return `  useEffect(() => {
+${lines}
+  }, []);`;
 }
 
 function buildTypeDefinitions(typing: R3FTypingMode) {
@@ -830,6 +1013,8 @@ function assembleR3FComponent(
 
   const hasAnimations = animatedObjectIds.size > 0;
   const hasRefs = refObjectIds.size > 0;
+  const animationHooks = buildAnimationHooks(scene.objects, animationList, refNameMap);
+  const runtimeWarningEffect = buildRuntimeWarningEffect(animationHooks.warnings);
   const refType = typing === "typescript" ? "<ObjectRef | null>" : "";
   const refDeclarations = scene.objects
     .map((object) => {
@@ -838,7 +1023,6 @@ function assembleR3FComponent(
     .filter(Boolean)
     .join("\n");
 
-  const animationHooks = buildAnimationHooks(scene.objects, animationList, refNameMap);
   const lightingJsx = buildLightingJsx(scene);
   const sceneGraph = buildSceneGraph(
     scene,
@@ -850,14 +1034,33 @@ function assembleR3FComponent(
     ...synthesizedComponentEntries.warningComments,
     ...synthesizedComponentEntries.entries.map((entry) => entry.definitionBlock)
   ].join("\n\n");
-  const imports = buildImports(hasAnimations, hasTransmission, hasRefs, typing);
+  const imports = buildImports(
+    hasAnimations,
+    hasTransmission,
+    hasRefs,
+    typing,
+    animationHooks.warnings.length > 0
+  );
   const typeDefinitions = buildTypeDefinitions(typing);
   const propTypesBlock = buildPropTypesBlock(typing);
   const useClientDirective = framework === "nextjs" ? `"use client";\n\n` : "";
+  const fallbackObjects = scene.objects
+    .filter(isSynthesisObject)
+    .filter((object) => {
+      const entry = synthesizedComponentEntries.entryByObjectId.get(object.id);
+
+      return !entry || !entry.verified;
+    });
+  const warnings = [
+    ...synthesizedComponentEntries.warnings,
+    ...fallbackObjects
+      .filter((object) => !synthesizedComponentEntries.entryByObjectId.has(object.id))
+      .map((object) => `Component '${object.name ?? object.id}' (id: ${object.id}) was not provided. Rendered as placeholder.`)
+  ];
 
   const sceneContent = `function SceneContent() {
 ${refDeclarations || ""}
-${animationHooks ? `\n${animationHooks}\n` : ""}
+${runtimeWarningEffect ? `\n${runtimeWarningEffect}` : ""}${animationHooks.hooks ? `\n${animationHooks.hooks}\n` : ""}
   return (
     <>
 ${lightingJsx}
@@ -884,12 +1087,16 @@ export default function GeneratedScene() {
 ${propTypesBlock}`;
 
   return {
-    status: "SUCCESS",
+    status: sceneGraph.placeholderObjectCount > 0 ? "PARTIAL_SUCCESS" : "SUCCESS",
     r3f_code: fullComponent,
     language: typing === "typescript" ? "tsx" : "jsx",
     framework,
     synthesized_object_count: Object.keys(synthesizedComponents).length,
     placeholder_object_count: sceneGraph.placeholderObjectCount,
+    warnings: warnings.length > 0 ? warnings : undefined,
+    warning: sceneGraph.placeholderObjectCount > 0
+      ? `Placeholder meshes were used for synthesized components: ${fallbackObjects.map((object) => object.name || object.id).join(", ")}.`
+      : undefined,
     scene_id: scene.scene_id
   };
 }
@@ -915,7 +1122,7 @@ function generatePlaceholderScene(
         `      {/* Placeholder: ${object.name ?? object.id ?? "object"} */}`,
         `      <mesh position={${JSON.stringify(position)}} rotation={${JSON.stringify(rotation)}} scale={${JSON.stringify(scale)}}>`,
         `        <boxGeometry args={[${width}, ${height}, ${depth}]} />`,
-        `        <meshStandardMaterial color="${FALLBACK_PLACEHOLDER_COLOR}" wireframe />`,
+        `        <meshStandardMaterial color="${FAILED_SYNTHESIS_PLACEHOLDER_COLOR}" wireframe />`,
         "      </mesh>"
       ].join("\n");
     })
@@ -964,9 +1171,6 @@ export function handleGenerateR3FCode(
     }
 
     const result = assembleR3FComponent(scene, framework, typing, autoFilledComponents);
-    const placeholderNames = contractObjects
-      .filter((object) => !autoFilledComponents[object.id])
-      .map((object) => object.name || object.id);
 
     for (const [objectId, jsx] of Object.entries(providedComponents)) {
       const object = contractObjects.find((entry) => entry.id === objectId);
@@ -983,15 +1187,6 @@ export function handleGenerateR3FCode(
         material_preset: getSceneMaterialPreset(scene),
         accent_color: getSceneAccentColor(scene)
       });
-    }
-
-    if (result.placeholder_object_count && result.placeholder_object_count > 0) {
-      return {
-        ...result,
-        warning: placeholderNames.length > 0
-          ? `Placeholder meshes were used for unresolved synthesis objects: ${placeholderNames.join(", ")}. Provide synthesized_components with raw JSX strings to replace them.`
-          : "Placeholder meshes were used for one or more synthesis objects because their synthesized components could not be verified."
-      };
     }
 
     return result;
@@ -1026,7 +1221,11 @@ export function handleGenerateR3FCode(
 export function generateR3FCode(scene: SceneData, options: GenerateR3FOptions = {}) {
   const result = handleGenerateR3FCode(scene, options);
 
-  if (result.status === "SUCCESS" || result.status === "PARTIAL") {
+  if (
+    result.status === "SUCCESS" ||
+    result.status === "PARTIAL_SUCCESS" ||
+    result.status === "PARTIAL"
+  ) {
     return result.r3f_code;
   }
 
@@ -1034,5 +1233,9 @@ export function generateR3FCode(scene: SceneData, options: GenerateR3FOptions = 
     throw new Error(result.message);
   }
 
-  throw new Error(result.error);
+  if (result.status === "ERROR") {
+    throw new Error(result.error);
+  }
+
+  throw new Error("Unknown generate_r3f_code failure.");
 }

@@ -203,6 +203,19 @@ function buildCategoryPreviewScript() {
             category: "particle_system",
             bounding_box: [1.2, 1.2, 1.2]
           }
+        },
+        {
+          id: "ring_1",
+          type: "synthesis_contract",
+          name: "diamond_ring",
+          position: [1.7, 0.1, 0.5],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          synthesis_contract: {
+            __type: "SYNTHESIS_REQUIRED",
+            category: "accessory",
+            bounding_box: [0.03, 0.03, 0.03]
+          }
         }
       ],
       animations: []
@@ -211,6 +224,67 @@ function buildCategoryPreviewScript() {
     const result = buildPreviewResult(scene, "top", {
       previewId: "11111111-1111-4111-8111-111111111111",
       generatedAt: "2026-03-30T00:00:00.000Z"
+    });
+
+    console.log(JSON.stringify(result));
+  `;
+}
+
+function buildMetadataFallbackPreviewScript() {
+  return `
+    import { buildPreviewResult } from "${DIST_ROOT}/tools/preview.tool.js";
+
+    const scene = {
+      scene_id: "scene_preview_metadata_fallbacks",
+      metadata: {
+        title: "",
+        style: "",
+        design_tokens: {
+          use_case: "advertisement",
+          theme: "premium",
+          material_preset: "metal_chrome",
+          animation: "none",
+          lighting_preset: "studio_soft",
+          background_preset: "dark_studio",
+          composition: "hero_centered"
+        },
+        color_hints: [],
+        created_at: "2026-04-01T00:00:00.000Z"
+      },
+      environment: {
+        background: {
+          type: "color",
+          value: "#050a15"
+        }
+      },
+      camera: {
+        type: "perspective",
+        position: [0, 2, 5],
+        fov: 45,
+        target: [0, 0, 0]
+      },
+      lighting: [],
+      objects: [
+        {
+          id: "phone_1",
+          type: "primitive",
+          name: "phone",
+          shape: "box",
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          material: {
+            type: "standard",
+            color: "#ffffff"
+          }
+        }
+      ],
+      animations: []
+    };
+
+    const result = buildPreviewResult(scene, "top", {
+      previewId: "22222222-2222-4222-8222-222222222222",
+      generatedAt: "2026-04-01T00:00:00.000Z"
     });
 
     console.log(JSON.stringify(result));
@@ -262,6 +336,17 @@ test("buildPreviewResult uses category-aware SVG shapes for bags, surfaces, and 
   assert.match(result.svg_wireframe, /data-object-id="bag_1"[\s\S]*<rect/s);
   assert.match(result.svg_wireframe, /data-object-id="surface_1"[\s\S]*height="4"/s);
   assert.match(result.svg_wireframe, /data-object-id="particles_1"[\s\S]*<circle[\s\S]*<circle[\s\S]*<circle/s);
+  assert.match(result.svg_wireframe, /data-object-id="ring_1"[\s\S]*<ellipse[\s\S]*<ellipse/s);
   assert.match(result.svg_wireframe, /\u26a0 pending|⚠ pending/);
-  assert.match(result.svg_wireframe, /solid stroke = resolved, dashed stroke = pending synthesis/);
+  assert.match(result.svg_wireframe, /dashed stroke = pending synthesis \(shape still reflects object category\)/);
+});
+
+test("buildPreviewResult falls back cleanly for missing title use_case and style metadata", () => {
+  const result = runJson(buildMetadataFallbackPreviewScript());
+
+  assert.match(result.svg_wireframe, /Untitled Scene/);
+  assert.match(result.text_description.scene_overview, /Title: Untitled Scene/);
+  assert.match(result.text_description.scene_overview, /Use case: advertisement/);
+  assert.match(result.text_description.scene_overview, /Style: premium/);
+  assert.doesNotMatch(result.text_description.scene_overview, /undefined|null/);
 });

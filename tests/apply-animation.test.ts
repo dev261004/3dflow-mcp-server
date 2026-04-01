@@ -287,3 +287,22 @@ test("pulse_preserves_amplitude_and_exposes_derived_scale_fields", () => {
   assert.equal(secondPass.scene_data.animations[0].config.scale, 1.03);
   assert.deepEqual(secondPass.scene_data.animations[0].config.scale_range, [1, 1.03]);
 });
+
+test("tool returns structured error payload when scene_data is invalid", () => {
+  const result = runJson(`
+    import { applyAnimationTool } from "${DIST_ROOT}/tools/applyAnimation.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
+
+    const payload = unwrapToolPayload(await applyAnimationTool.execute({
+      scene_data: null,
+      animation_type: "float"
+    }));
+
+    console.log(JSON.stringify(payload));
+  `);
+
+  assert.equal(result.status, "ERROR");
+  assert.equal(result.error_code, "INTERNAL_ERROR");
+  assert.match(result.error_message, /scene_data must be an object/i);
+  assert.deepEqual(result.partial_data, {});
+});

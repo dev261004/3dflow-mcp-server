@@ -337,15 +337,27 @@ export const applyAnimationTool = {
   parameters: applyAnimationSchema,
 
   async execute(input: z.infer<typeof applyAnimationSchema>) {
-    const normalizedScene = normalizeScene(input.scene_data);
+    const partialData: Record<string, unknown> = {};
 
-    return createToolResult(
-      buildApplyAnimationOutput({
-        scene_data: normalizedScene,
-        animation_type: input.animation_type,
-        animations: input.animations,
-        merge: input.merge
-      })
-    );
+    try {
+      const normalizedScene = normalizeScene(input.scene_data);
+      partialData.scene_data = normalizedScene;
+
+      return createToolResult(
+        buildApplyAnimationOutput({
+          scene_data: normalizedScene,
+          animation_type: input.animation_type,
+          animations: input.animations,
+          merge: input.merge
+        })
+      );
+    } catch (error) {
+      return createToolResult({
+        status: "ERROR",
+        error_code: "INTERNAL_ERROR",
+        error_message: error instanceof Error ? error.message : "Failed to apply animations.",
+        partial_data: partialData
+      });
+    }
   }
 };

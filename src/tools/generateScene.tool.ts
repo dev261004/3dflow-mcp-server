@@ -58,48 +58,64 @@ This tool is deterministic and does not interpret intent.
     }),
 
     async execute({ scene_plan }: any) {
-        const normalizedPlan = normalizeScenePlan(scene_plan);
-        const objects = Array.isArray(normalizedPlan.objects)
-            ? [...new Set(normalizedPlan.objects.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean))]
-            : [];
-        const rawStyle = typeof normalizedPlan.style === "string" ? normalizedPlan.style.trim() : undefined;
-        const designTokens = normalizeDesignTokens(normalizedPlan.design_tokens, {
-            use_case: normalizedPlan.use_case,
-            style: normalizedPlan.style,
-            animation: normalizedPlan.animation
-        });
+        const partialData: Record<string, unknown> = {};
 
-        const colorHintsRaw = normalizedPlan.color_hints;
-        const colorHints = Array.isArray(colorHintsRaw)
-            ? colorHintsRaw.filter(
-                (hint): hint is { name: string; hex: string; role: "background" | "accent" | "general" } =>
-                    typeof hint === "object" &&
-                    hint !== null &&
-                    typeof hint.name === "string" &&
-                    typeof hint.hex === "string" &&
-                    typeof hint.role === "string"
-              )
-            : [];
+        try {
+            const normalizedPlan = normalizeScenePlan(scene_plan);
+            partialData.scene_plan = normalizedPlan;
 
-        if (objects.length === 0) {
-            throw new Error("Scene plan must include at least one object");
+            const objects = Array.isArray(normalizedPlan.objects)
+                ? [...new Set(normalizedPlan.objects.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean))]
+                : [];
+            const rawStyle = typeof normalizedPlan.style === "string" ? normalizedPlan.style.trim() : undefined;
+            const designTokens = normalizeDesignTokens(normalizedPlan.design_tokens, {
+                use_case: normalizedPlan.use_case,
+                style: normalizedPlan.style,
+                animation: normalizedPlan.animation
+            });
+            partialData.design_tokens = designTokens;
+            partialData.objects = objects;
+
+            const colorHintsRaw = normalizedPlan.color_hints;
+            const colorHints = Array.isArray(colorHintsRaw)
+                ? colorHintsRaw.filter(
+                    (hint): hint is { name: string; hex: string; role: "background" | "accent" | "general" } =>
+                        typeof hint === "object" &&
+                        hint !== null &&
+                        typeof hint.name === "string" &&
+                        typeof hint.hex === "string" &&
+                        typeof hint.role === "string"
+                  )
+                : [];
+
+            if (objects.length === 0) {
+                throw new Error("Scene plan must include at least one object");
+            }
+            if (objects.length > MAX_SCENE_PLAN_OBJECTS) {
+                throw new Error(`Maximum ${MAX_SCENE_PLAN_OBJECTS} objects allowed`);
+            }
+            const scene = buildScene({
+                ...normalizedPlan,
+                objects,
+                style: rawStyle || designTokens.theme,
+                use_case: designTokens.use_case,
+                animation: designTokens.animation,
+                design_tokens: designTokens,
+                color_hints: colorHints
+            });
+            partialData.scene_data = scene;
+
+            return createToolResult({
+                scene_data: scene,
+                warnings: scene.notes ?? []
+            });
+        } catch (error) {
+            return createToolResult({
+                status: "ERROR",
+                error_code: "INTERNAL_ERROR",
+                error_message: error instanceof Error ? error.message : "Failed to generate scene.",
+                partial_data: partialData
+            });
         }
-        if (objects.length > MAX_SCENE_PLAN_OBJECTS) {
-            throw new Error(`Maximum ${MAX_SCENE_PLAN_OBJECTS} objects allowed`);
-        }
-        const scene = buildScene({
-            ...normalizedPlan,
-            objects,
-            style: rawStyle || designTokens.theme,
-            use_case: designTokens.use_case,
-            animation: designTokens.animation,
-            design_tokens: designTokens,
-            color_hints: colorHints
-        });
-
-        return createToolResult({
-            scene_data: scene,
-            warnings: scene.notes ?? []
-        });
     }
 };

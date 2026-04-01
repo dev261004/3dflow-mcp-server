@@ -87,11 +87,17 @@ synthesized_components.
       complexity: resolvedComplexity,
       target: input.target
     });
+    const warnings = contract.category === "unknown"
+      ? [
+          `Category could not be determined for object '${input.object_name}'. Using generic fallback bounding box and assembly hint. Consider using a more specific object name.`
+        ]
+      : [];
 
     return createToolResult({
       synthesis_contract: contract,
       ready_to_generate: true,
-      next_step: `Generate JSX geometry following synthesis_contract.constraints exactly. Then call generate_r3f_code with synthesized_components: { "${objectId}": "<your JSX>" }`
+      warnings,
+      next_step: `Generate JSX geometry following synthesis_contract.constraints exactly. Then call generate_r3f_code with parameters: scene_data (object), synthesized_components (object mapping object_id -> JSX string, for example { "${objectId}": "<your JSX>" }), framework (string: nextjs|vite|plain), typing (string: none|typescript|prop-types).`
     });
   }
 };

@@ -1,7 +1,7 @@
 import type { ObjectCategory } from "../lib/objectCategories.js";
 import type { ComplexityTier } from "../lib/complexity.profiles.js";
 
-export type SynthesisStatus = "SYNTHESIS_REQUIRED" | "SUCCESS";
+export type SynthesisStatus = "SYNTHESIS_REQUIRED" | "SUCCESS" | "PARTIAL_SUCCESS";
 
 export interface SynthesisConstraints {
   geometryOnly: string;
@@ -75,13 +75,14 @@ export interface SynthesisRequiredOutput {
 }
 
 export interface AssembledR3FOutput {
-  status: "SUCCESS";
+  status: "SUCCESS" | "PARTIAL_SUCCESS";
   r3f_code: string;
   language: "tsx" | "jsx";
   framework: string;
   synthesized_object_count: number;
   placeholder_object_count?: number;
   warning?: string;
+  warnings?: string[];
   scene_id: string;
 }
 

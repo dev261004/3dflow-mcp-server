@@ -164,8 +164,20 @@ export const validateSceneTool = {
   parameters: validateSceneSchema,
 
   async execute({ scene_data, strict = false }: z.infer<typeof validateSceneSchema>) {
-    const normalizedScene = normalizeSceneData(unwrapToolPayload<SceneData>(scene_data, "scene_data"));
+    const partialData: Record<string, unknown> = {};
 
-    return createToolResult(buildValidateSceneOutput(normalizedScene, strict));
+    try {
+      const normalizedScene = normalizeSceneData(unwrapToolPayload<SceneData>(scene_data, "scene_data"));
+      partialData.scene_data = normalizedScene;
+
+      return createToolResult(buildValidateSceneOutput(normalizedScene, strict));
+    } catch (error) {
+      return createToolResult({
+        status: "ERROR",
+        error_code: "INTERNAL_ERROR",
+        error_message: error instanceof Error ? error.message : "Failed to validate scene.",
+        partial_data: partialData
+      });
+    }
   }
 };

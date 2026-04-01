@@ -26,7 +26,7 @@ export function buildSynthesisContract(params: {
   const category = detectCategory(params.objectName);
   const complexityTier = resolveContractComplexity(params);
   const profile = COMPLEXITY_PROFILES[complexityTier];
-  const boundingBox = getBoundingBox(category, complexityTier);
+  const boundingBox = getBoundingBox(category, complexityTier, params.objectName);
   const materialInstructions = buildMaterialInstructions(
     params.materialPreset,
     params.baseColor,
@@ -34,6 +34,12 @@ export function buildSynthesisContract(params: {
     complexityTier,
     profile.material_rule
   );
+
+  if (category === "unknown") {
+    console.warn(
+      `Category could not be determined for object '${params.objectName}'. Using generic fallback bounding box and assembly hint. Consider using a more specific object name.`
+    );
+  }
 
   return {
     __type: "SYNTHESIS_REQUIRED",
@@ -65,7 +71,7 @@ export function buildSynthesisContract(params: {
         "The root <group> element MUST accept a forwarded ref: use React.forwardRef and apply the ref to the root <group ref={ref}>.",
       returnFormat:
         "Return ONLY the JSX - a single React.forwardRef component. No import statements. No export statements. No markdown. No explanation. Just the raw JSX starting with: const ComponentName = React.forwardRef((",
-      assemblyHint: buildAssemblyHint(category, complexityTier),
+      assemblyHint: buildAssemblyHint(category, complexityTier, params.objectName),
       styleHint: `Visual style is "${params.style}". Reflect this in proportions, details, and material choices. Futuristic = sharp angles + neon accents. Premium = smooth + chrome. Playful = rounded + bright colors. Minimal = clean + simple forms.`,
       accentColorHint: complexityTier === "low"
         ? `Primary accent color is ${params.accentColor}. Use it on at most 1 non-emissive accent surface. Do not add glow, emissive joints, or neon highlights at this tier.`

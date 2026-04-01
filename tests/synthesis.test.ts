@@ -228,12 +228,13 @@ test("buildSynthesisContract returns expected robot contract", () => {
 test("handleGenerateR3FCode renders placeholders when synthesized components are missing", () => {
   const result = runJson(buildSceneScript());
 
-  assert.equal(result.status, "SUCCESS");
+  assert.equal(result.status, "PARTIAL_SUCCESS");
   assert.equal(result.placeholder_object_count, 1);
   assert.match(result.warning, /Placeholder meshes were used/i);
+  assert.match(result.warnings[0], /was not provided/i);
   assert.match(result.r3f_code, /robot placeholder rendered because synthesized JSX was not provided/i);
   assert.match(result.r3f_code, /<boxGeometry args=\{\[0\.6, 1\.8, 0\.5\]\} \/>/);
-  assert.match(result.r3f_code, /meshStandardMaterial color="#666666" wireframe/);
+  assert.match(result.r3f_code, /meshStandardMaterial color="#ff4444" wireframe/);
 });
 
 test("handleGenerateR3FCode returns success when synthesized components are provided", () => {
@@ -246,6 +247,159 @@ test("handleGenerateR3FCode returns success when synthesized components are prov
   assert.match(result.r3f_code, /const robotRef = useRef<ObjectRef \| null>\(null\);/);
   assert.match(result.r3f_code, /if \(!robotRef\.current\) return;/);
   assert.match(result.r3f_code, /<RobotGeometry ref=\{robotRef\} position=\{\[0,0,0\]\} rotation=\{\[0,0,0\]\} scale=\{\[1,1,1\]\} \/>/);
+});
+
+test("handleGenerateR3FCode merges float and bounce hooks on the same axis", () => {
+  const result = runJson(`
+    import { handleGenerateR3FCode } from "${DIST_ROOT}/services/r3fGenerator.js";
+
+    const scene = {
+      scene_id: "scene_animation_merge",
+      metadata: {
+        title: "Animation Merge",
+        use_case: "website",
+        style: "minimal",
+        created_at: "2026-04-01T00:00:00.000Z"
+      },
+      environment: {
+        background: {
+          type: "color",
+          value: "#050a15"
+        }
+      },
+      camera: {
+        type: "perspective",
+        position: [0, 2, 5],
+        fov: 45,
+        target: [0, 0, 0]
+      },
+      lighting: [],
+      objects: [
+        {
+          id: "box_1",
+          type: "primitive",
+          name: "box",
+          shape: "box",
+          position: [0, 0.08, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          material: {
+            type: "standard",
+            color: "#ffffff"
+          }
+        }
+      ],
+      animations: [
+        {
+          id: "anim_float",
+          target: "box",
+          target_id: "box_1",
+          type: "float",
+          config: {
+            amplitude: 0.18,
+            speed: 0.9,
+            axis: "y"
+          },
+          loop: true
+        },
+        {
+          id: "anim_bounce",
+          target: "box",
+          target_id: "box_1",
+          type: "bounce",
+          config: {
+            amplitude: 0.05,
+            speed: 0.6,
+            axis: "y"
+          },
+          loop: true
+        }
+      ]
+    };
+
+    console.log(JSON.stringify(handleGenerateR3FCode(scene, {
+      framework: "plain",
+      typing: "none"
+    })));
+  `);
+
+  assert.equal(result.status, "SUCCESS");
+  assert.equal((result.r3f_code.match(/useFrame\(/g) || []).length, 1);
+  assert.match(result.r3f_code, /const floatY = Math\.sin\(t \* 0\.9\) \* 0\.18;/);
+  assert.match(result.r3f_code, /const bounceY = Math\.abs\(Math\.sin\(t \* 0\.6\)\) \* 0\.05;/);
+  assert.match(result.r3f_code, /boxRef\.current\.position\.y = 0\.08 \+ floatY \+ bounceY;/);
+  assert.doesNotMatch(result.r3f_code, /\+=/);
+});
+
+test("handleGenerateR3FCode degrades to a placeholder when a synthesized component fails verification", () => {
+  const result = runJson(`
+    import { buildSynthesisContract } from "${DIST_ROOT}/lib/synthesisContract.js";
+    import { handleGenerateR3FCode } from "${DIST_ROOT}/services/r3fGenerator.js";
+
+    const contract = buildSynthesisContract({
+      objectId: "wallet_1",
+      objectName: "wallet",
+      style: "premium",
+      materialPreset: "metal_chrome",
+      baseColor: "#f6f7fb",
+      accentColor: "#c6924c",
+      complexity: "medium"
+    });
+
+    const scene = {
+      scene_id: "scene_invalid_component",
+      metadata: {
+        title: "Invalid Component",
+        use_case: "showcase",
+        style: "premium",
+        created_at: "2026-04-01T00:00:00.000Z"
+      },
+      environment: {
+        background: {
+          type: "color",
+          value: "#050a15"
+        }
+      },
+      camera: {
+        type: "perspective",
+        position: [0, 2, 5],
+        fov: 45,
+        target: [0, 0, 0]
+      },
+      lighting: [],
+      objects: [
+        {
+          id: "wallet_1",
+          type: "synthesis_contract",
+          name: "wallet",
+          shape: "SYNTHESIS_REQUIRED",
+          synthesis_contract: contract,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          material: {
+            type: "standard",
+            color: "#f6f7fb"
+          }
+        }
+      ],
+      animations: []
+    };
+
+    console.log(JSON.stringify(handleGenerateR3FCode(scene, {
+      framework: "plain",
+      typing: "none",
+      synthesized_components: {
+        wallet_1: "<group><mesh /></group>"
+      }
+    })));
+  `);
+
+  assert.equal(result.status, "PARTIAL_SUCCESS");
+  assert.equal(result.placeholder_object_count, 1);
+  assert.match(result.warnings[0], /failed verification/i);
+  assert.match(result.r3f_code, /wallet placeholder rendered because synthesized component could not be verified/i);
+  assert.match(result.r3f_code, /meshStandardMaterial color="#ff4444" wireframe/);
 });
 
 test("handleGenerateR3FCode falls back to a placeholder scene on internal failure", () => {
@@ -344,6 +498,33 @@ test("synthesize_geometry tool returns a contract", () => {
   assert.equal(result.synthesis_contract.object_name, "robot");
   assert.equal(result.synthesis_contract.complexity_tier, "medium");
   assert.equal(result.ready_to_generate, true);
+  assert.equal(result.warnings.length, 0);
+  assert.match(result.next_step, /scene_data \(object\)/);
+  assert.match(result.next_step, /synthesized_components/);
+  assert.match(result.next_step, /framework \(string: nextjs\|vite\|plain\)/);
+  assert.match(result.next_step, /typing \(string: none\|typescript\|prop-types\)/);
+});
+
+test("synthesize_geometry warns when category remains unknown", () => {
+  const result = runJson(`
+    import { synthesizeGeometryTool } from "${DIST_ROOT}/tools/synthesizeGeometry.tool.js";
+    import { unwrapToolPayload } from "${DIST_ROOT}/utils/toolPayload.js";
+
+    const input = synthesizeGeometryTool.parameters.parse({
+      object_name: "mystery_widget_xyz",
+      style: "minimal",
+      material_preset: "matte_soft",
+      base_color: "#e8edf8",
+      accent_color: "#00F5FF",
+      object_id: "mystery_1"
+    });
+    const payload = unwrapToolPayload(await synthesizeGeometryTool.execute(input));
+
+    console.log(JSON.stringify(payload));
+  `);
+
+  assert.equal(result.synthesis_contract.category, "unknown");
+  assert.match(result.warnings[0], /Category could not be determined/i);
 });
 
 test("generate_scene_plan treats mixed style cues as a recommendation instead of a warning", () => {
