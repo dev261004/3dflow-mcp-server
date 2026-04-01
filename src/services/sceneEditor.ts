@@ -123,6 +123,16 @@ const MOVEMENT_PATTERNS = {
 } as const;
 
 const MOVEMENT_VERB_PATTERNS = [/\bmove\b/i, /\bshift\b/i, /\bslide\b/i, /\bnudge\b/i, /\bpush\b/i];
+const BACKGROUND_INTENT_PATTERN = /backgr|backdrop|\bbg\b|warmer|cooler|midnight|charcoal|deep black|navy|off-white|off white|cream|scene color|scene colour|background color|background colour|make it [a-z-]+|change (?:the )?background/i;
+const NAMED_BACKGROUND_COLORS: Record<string, string> = {
+  navy: "#0a1628",
+  charcoal: "#1f2937",
+  midnight: "#0f1b3d",
+  "deep black": "#05070a",
+  "off-white": "#f5f5f0",
+  "off white": "#f5f5f0",
+  cream: "#fef3c7"
+};
 
 function pushUnique(list: string[], message: string) {
   if (!list.includes(message)) {
@@ -278,6 +288,30 @@ function getNamedTarget(objects: SceneObject[], prompt: string) {
       const namePattern = new RegExp(`(?:^|\\s)${normalizedName.split(" ").map(escapeRegex).join("\\s+")}(?:$|\\s)`, "i");
       return namePattern.test(normalizedPrompt);
     });
+}
+
+function getLeftmostNamedTarget(objects: SceneObject[], prompt: string) {
+  const normalizedPrompt = normalizeText(prompt);
+  const matches = objects
+    .map((object, index) => ({
+      object,
+      index,
+      normalizedName: normalizeText(object.name || "")
+    }))
+    .filter(({ normalizedName }) => normalizedName.length > 0)
+    .map((entry) => {
+      const namePattern = new RegExp(`(?:^|\\s)${entry.normalizedName.split(" ").map(escapeRegex).join("\\s+")}(?:$|\\s)`, "i");
+      const match = namePattern.exec(normalizedPrompt);
+
+      return {
+        ...entry,
+        position: match?.index ?? -1
+      };
+    })
+    .filter(({ position }) => position >= 0)
+    .sort((left, right) => left.position - right.position || left.index - right.index);
+
+  return matches[0]?.object;
 }
 
 function validateSceneInput(scene: unknown) {
@@ -485,6 +519,114 @@ function shiftBackground(scene: EditableScene, direction: "darker" | "lighter", 
   }
 }
 
+function promptHasBackgroundIntent(prompt: string) {
+  return BACKGROUND_INTENT_PATTERN.test(prompt);
+}
+
+function hasBackgroundSummaryEntry(summary: EditSummary) {
+  return (
+    summary.applied.some((entry) => entry.toLowerCase().includes("background")) ||
+    summary.skipped.some((entry) => entry.toLowerCase().includes("background"))
+  );
+}
+
+function resolveBackgroundColor(prompt: string, currentBackground: string) {
+  const normalizedPrompt = normalizeText(prompt);
+  const lowerPrompt = prompt.toLowerCase();
+
+  const hexMatch = prompt.match(/#(?:[0-9a-f]{3}|[0-9a-f]{6})/i);
+
+  if (hexMatch) {
+    return {
+      color: hexMatch[0].toLowerCase(),
+      label: hexMatch[0].toLowerCase()
+    };
+  }
+
+  const namedColorEntry = Object.entries(NAMED_BACKGROUND_COLORS)
+    .find(([name]) => lowerPrompt.includes(name));
+
+  if (namedColorEntry) {
+    return {
+      color: namedColorEntry[1],
+      label: namedColorEntry[0]
+    };
+  }
+
+  if (!isHexColor(currentBackground)) {
+    return null;
+  }
+
+  if (/\bwarmer\b/i.test(prompt)) {
+    return {
+      color: mixHex(currentBackground, "#2a140c", 0.2),
+      label: "warmer dark"
+    };
+  }
+
+  if (/\bcooler\b/i.test(prompt)) {
+    return {
+      color: mixHex(currentBackground, "#0b1f3a", 0.2),
+      label: "cooler dark"
+    };
+  }
+
+  if (/\bslightly lighter\b/i.test(normalizedPrompt) || /\blighter background\b/i.test(normalizedPrompt)) {
+    return {
+      color: mixHex(currentBackground, "#ffffff", 0.08),
+      label: "slightly lighter"
+    };
+  }
+
+  if (/\bslightly darker\b/i.test(normalizedPrompt) || /\bdarker background\b/i.test(normalizedPrompt)) {
+    return {
+      color: mixHex(currentBackground, "#05070a", 0.12),
+      label: "slightly darker"
+    };
+  }
+
+  return null;
+}
+
+function applyBackgroundIntent(scene: EditableScene, prompt: string, summary: EditSummary) {
+  const currentBackground = scene.environment.background.value;
+  const resolvedColor = resolveBackgroundColor(prompt, currentBackground);
+
+  if (!resolvedColor) {
+    pushUnique(
+      summary.skipped,
+      `background color change: could not resolve color from "${prompt}". Pass an explicit hex value (e.g. edit_prompt: "set background to #12100e").`
+    );
+    return false;
+  }
+
+  if (!isHexColor(resolvedColor.color)) {
+    pushUnique(
+      summary.skipped,
+      `background color change: resolved "${resolvedColor.label}" to an invalid color value. Pass an explicit hex value instead.`
+    );
+    return false;
+  }
+
+  if (resolvedColor.color === currentBackground) {
+    pushUnique(summary.skipped, `background color change: background already matches ${resolvedColor.color}`);
+    return false;
+  }
+
+  scene.environment.background.value = resolvedColor.color;
+
+  const designTokens = ensureDesignTokens(scene);
+
+  if (resolvedColor.color === "#ffffff" || resolvedColor.color === "#f5f5f0" || resolvedColor.color === "#fef3c7") {
+    designTokens.background_preset = "light_clean";
+  } else {
+    designTokens.background_preset = "dark_studio";
+  }
+
+  pushUnique(summary.applied, `background → ${resolvedColor.color} (${resolvedColor.label})`);
+  return true;
+}
+
 function adjustLighting(scene: EditableScene, direction: "darker" | "lighter", summary: EditSummary) {
   const lighting = Array.isArray(scene.lighting) ? scene.lighting : [];
 
@@ -682,6 +824,7 @@ function applyPositionIntent(scene: EditableScene, prompt: string, summary: Edit
   });
 
   if (!verticalDirection && !horizontalDirection) {
+    pushUnique(summary.skipped, `position: no direction was found in "${prompt}"`);
     return;
   }
 
@@ -742,12 +885,21 @@ function applyAnimationIntent(scene: EditableScene, prompt: string, summary: Edi
   }
 
   const animationIntent = detectAnimationIntent(prompt);
-  const generatedAnimations = requestedTypes.flatMap((type) => buildAnimations(scene.objects, type));
+  const leftmostNamedTarget = getLeftmostNamedTarget(scene.objects, prompt);
+  const targetObject = leftmostNamedTarget ?? scene.objects[0];
+
+  if (!targetObject) {
+    pushUnique(summary.skipped, "animation: no objects are available to animate");
+    return false;
+  }
+
+  const generatedAnimations = requestedTypes.flatMap((type) => buildAnimations([targetObject], type));
   const { uniqueAnimations, skippedCount } = dedupeAnimations(generatedAnimations);
+  const targetLabel = targetObject.name?.trim() || targetObject.id;
 
   if (animationIntent.mode === "replace") {
     scene.animations = uniqueAnimations;
-    pushUnique(summary.applied, `animation → replaced with ${requestedTypes.join(", ")}`);
+    pushUnique(summary.applied, `animation → replaced with ${requestedTypes.join(", ")} on ${targetLabel}`);
     if (skippedCount > 0) {
       pushUnique(summary.warnings, `Collapsed ${skippedCount} duplicate generated animation${skippedCount === 1 ? "" : "s"} while replacing the animation stack.`);
     }
@@ -760,12 +912,12 @@ function applyAnimationIntent(scene: EditableScene, prompt: string, summary: Edi
   const duplicateCount = uniqueAnimations.length - animationsToAppend.length;
 
   if (animationsToAppend.length === 0) {
-    pushUnique(summary.skipped, `animation: ${requestedTypes.join(", ")} already exists on the scene`);
+    pushUnique(summary.skipped, `animation: ${requestedTypes.join(", ")} already exists on ${targetLabel}`);
     return false;
   }
 
   scene.animations = [...existingAnimations, ...animationsToAppend];
-  pushUnique(summary.applied, `animation → added ${requestedTypes.join(", ")}`);
+  pushUnique(summary.applied, `animation → added ${requestedTypes.join(", ")} to ${targetLabel}`);
 
   if (duplicateCount > 0 || skippedCount > 0) {
     const totalDuplicates = duplicateCount + skippedCount;
@@ -803,6 +955,12 @@ export function editScene(scene: any, prompt: string): EditSceneResult {
     skipped: [],
     warnings: []
   };
+  const recognizedIntentCount =
+    (promptHasBackgroundIntent(prompt) ? 1 : 0) +
+    (detectMaterialIntent(prompt, { applied: [], skipped: [], warnings: [] }) ? 1 : 0) +
+    (getRequestedAnimationTypes(prompt).length > 0 ? 1 : 0) +
+    (hasMovementVerb(prompt) ? 1 : 0) +
+    ((hasPattern(/\bdarker\b/i, prompt) || hasPattern(/\blighter\b/i, prompt) || hasDarkPresetIntent(prompt) || hasLightPresetIntent(prompt)) ? 1 : 0);
 
   ensureDesignTokens(updated);
 
@@ -832,9 +990,19 @@ export function editScene(scene: any, prompt: string): EditSceneResult {
 
   const animationsChanged = applyAnimationIntent(updated, prompt, editSummary);
   applyPositionIntent(updated, prompt, editSummary);
+
+  if (promptHasBackgroundIntent(prompt) && !hasBackgroundSummaryEntry(editSummary)) {
+    applyBackgroundIntent(updated, prompt, editSummary);
+  }
+
   syncAnimationToken(updated, editSummary, animationsChanged);
 
-  if (editSummary.applied.length === 0) {
+  if (editSummary.applied.length === 0 && editSummary.skipped.length === 0 && recognizedIntentCount === 0) {
+    pushUnique(
+      editSummary.skipped,
+      `edit not recognised: "${prompt}". Supported edits: background, material, animation, position, lighting.`
+    );
+  } else if (editSummary.applied.length === 0 && editSummary.skipped.length === 0) {
     pushUnique(editSummary.skipped, "No matching edit instructions were applied.");
   }
 

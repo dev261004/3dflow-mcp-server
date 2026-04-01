@@ -249,6 +249,114 @@ test("handleGenerateR3FCode returns success when synthesized components are prov
   assert.match(result.r3f_code, /<RobotGeometry ref=\{robotRef\} position=\{\[0,0,0\]\} rotation=\{\[0,0,0\]\} scale=\{\[1,1,1\]\} \/>/);
 });
 
+test("handleGenerateR3FCode returns success with zero placeholders when two synthesized components are valid", () => {
+  const result = runJson(`
+    import { buildSynthesisContract } from "${DIST_ROOT}/lib/synthesisContract.js";
+    import { handleGenerateR3FCode } from "${DIST_ROOT}/services/r3fGenerator.js";
+
+    const watchContract = buildSynthesisContract({
+      objectId: "watch_1",
+      objectName: "watch",
+      style: "premium",
+      materialPreset: "metal_chrome",
+      baseColor: "#f6f7fb",
+      accentColor: "#c6924c",
+      complexity: "medium"
+    });
+
+    const walletContract = buildSynthesisContract({
+      objectId: "wallet_1",
+      objectName: "wallet",
+      style: "premium",
+      materialPreset: "metal_chrome",
+      baseColor: "#f6f7fb",
+      accentColor: "#c6924c",
+      complexity: "medium"
+    });
+
+    const scene = {
+      scene_id: "scene_two_valid_components",
+      metadata: {
+        title: "Two Valid Components",
+        use_case: "advertisement",
+        style: "premium",
+        created_at: "2026-04-01T00:00:00.000Z"
+      },
+      environment: {
+        background: {
+          type: "color",
+          value: "#050a15"
+        }
+      },
+      camera: {
+        type: "perspective",
+        position: [0, 2, 5],
+        fov: 45,
+        target: [0, 0, 0]
+      },
+      lighting: [],
+      objects: [
+        {
+          id: "watch_1",
+          type: "synthesis_contract",
+          name: "watch",
+          shape: "SYNTHESIS_REQUIRED",
+          synthesis_contract: watchContract,
+          position: [-0.3, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          material: {
+            type: "standard",
+            color: "#f6f7fb"
+          }
+        },
+        {
+          id: "wallet_1",
+          type: "synthesis_contract",
+          name: "wallet",
+          shape: "SYNTHESIS_REQUIRED",
+          synthesis_contract: walletContract,
+          position: [0.4, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          material: {
+            type: "standard",
+            color: "#c6924c"
+          }
+        }
+      ],
+      animations: []
+    };
+
+    console.log(JSON.stringify(handleGenerateR3FCode(scene, {
+      framework: "plain",
+      typing: "none",
+      synthesized_components: {
+        watch_1: \`const WatchGeometry = React.forwardRef((props, ref) => (
+  <group ref={ref}>
+    <mesh>
+      <boxGeometry args={[0.2, 0.2, 0.2]} />
+      <meshStandardMaterial color="#f6f7fb" />
+    </mesh>
+  </group>
+));\`,
+        wallet_1: \`const WalletGeometry = React.forwardRef((props, ref) => (
+  <group ref={ref}>
+    <mesh>
+      <boxGeometry args={[0.3, 0.18, 0.05]} />
+      <meshStandardMaterial color="#c6924c" />
+    </mesh>
+  </group>
+));\`
+      }
+    })));
+  `);
+
+  assert.equal(result.status, "SUCCESS");
+  assert.equal(result.placeholder_object_count, 0);
+  assert.equal(result.synthesized_object_count, 2);
+});
+
 test("handleGenerateR3FCode merges float and bounce hooks on the same axis", () => {
   const result = runJson(`
     import { handleGenerateR3FCode } from "${DIST_ROOT}/services/r3fGenerator.js";
