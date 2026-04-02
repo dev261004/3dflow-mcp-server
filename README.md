@@ -1,95 +1,311 @@
 # 3dflow-mcp-server
-MCP server for 3D scene generation for web and ads. it's built 3d scene using react-three-fiber(R3F).
 
-## Development
+![MCP](https://img.shields.io/badge/MCP-Compatible-1f6feb) ![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933) ![License](https://img.shields.io/badge/License-MIT-yellow)
+![TypeScript](https://img.shields.io/badge/TypeScript-Server%20Code-3178C6?logo=typescript&logoColor=white) ![FastMCP](https://img.shields.io/badge/FastMCP-MCP%20Runtime-111827) ![Zod](https://img.shields.io/badge/Zod-Validation-3E67B1)
 
-Run the MCP server over stdio:
+Generate production-ready 3D scenes and React Three Fiber components from natural language directly inside your AI assistant.
+
+`3dflow-mcp-server` turns a plain-English prompt into a structured scene plan, validated `scene_data`, geometry synthesis contracts, framework-ready `.jsx` or `.tsx` React Three Fiber code, exportable assets, and integration guidance.
+
+## Quick Navigation
+
+| Start Here | Reference | Extra Docs |
+| --- | --- | --- |
+| [What It Does](#what-it-does) | [Recommended Pipeline](#recommended-pipeline) | [Quick Example](./quick_example.md) |
+| [Who It Helps](#who-it-helps) | [Tools](#tools) | [Tool Information](./tool_information.md) |
+| [Technologies](#technologies) | [Installation](#installation) | [Folder Structure](./folder_structure.md) |
+| [Architecture](#architecture) | [Deployment](#deployment) | [Sample Prompts](./sample_prompt.md) |
+| [Examples](#examples) | [Operational Notes](#operational-notes) | [License](#license) |
+
+## What It Does
+
+- Converts natural-language scene requests into a structured 3D workflow.
+- Produces `scene_data` with camera, lighting, objects, materials, background, animations, and design tokens.
+- Supports preview, validation, targeted editing, animation stacking, optimization, geometry synthesis, code generation, export, and integration help.
+- Generates React Three Fiber scene components for plain React, Vite, and Next.js.
+- Helps AI assistants follow a predictable, tool-based pipeline instead of generating raw 3D code from scratch.
+
+## Who It Helps
+
+- Frontend engineers building hero sections, landing pages, and product showcases.
+- Design engineers prototyping interactive web visuals and ad concepts.
+- AI application builders who want an MCP-based 3D scene workflow.
+- Agencies and product teams that need faster concept-to-code iteration for 3D scenes.
+
+## Technologies
+
+### Core Stack
+
+| Area | Technologies |
+| --- | --- |
+| Language | TypeScript |
+| MCP runtime | FastMCP |
+| Validation | Zod |
+| Runtime | Node.js |
+| Environment config | dotenv |
+| Testing | Jest |
+| Development workflow | nodemon, TypeScript compiler |
+
+### Output Ecosystem
+
+The server generates assets and guidance for:
+
+- React Three Fiber
+- Three.js
+- `@react-three/drei`
+- Next.js
+- Vite
+- plain React
+
+## Architecture
+
+This server is hybrid and supports two runtime modes.
+
+### Local Mode: `stdio`
+
+- Best for Claude Desktop, Cursor, and other local MCP clients.
+- Runs as a child process on the developer machine.
+- Ideal for local development and personal workflows.
+
+### Remote Mode: HTTP Stream
+
+- Best for shared teams, browser clients, and self-hosted deployments.
+- Exposes the MCP endpoint at `/mcp`.
+- Intended for self-hosting on Railway, Render, Fly.io, or any Node.js-capable server.
+
+Implementation note:
+
+- This repository uses FastMCP HTTP stream transport.
+- Remote clients should connect to `https://your-deployment.example.com/mcp`.
+
+## Recommended Pipeline
+
+```text
+optional: refine_prompt
+  -> generate_scene_plan
+  -> generate_scene
+  -> preview
+  -> validate_scene
+     -> if blocked: edit_scene -> preview -> validate_scene
+  -> optional: apply_animation
+  -> optional: optimize_for_web
+  -> synthesize_geometry
+     -> LLM generates JSX that follows the contract
+  -> generate_r3f_code
+  -> export_asset
+  -> integration_help
+```
+
+Notes:
+
+- `edit_scene` can be used any time after `generate_scene` and before `generate_r3f_code`.
+- `optimize_for_web` is optional but useful for mobile or performance-sensitive targets.
+- `generate_r3f_code` can return `SYNTHESIS_REQUIRED`, `SUCCESS`, `PARTIAL_SUCCESS`, or `ERROR`.
+- `PARTIAL_SUCCESS` means one or more objects fell back to a red wireframe placeholder.
+
+## Tools
+
+The server currently registers 12 tools.
+
+| # | Tool | Primary role |
+| --- | --- | --- |
+| 1 | `refine_prompt` | Structure free-form creative intent |
+| 2 | `generate_scene_plan` | Convert prompt into a scene plan |
+| 3 | `generate_scene` | Build full `scene_data` |
+| 4 | `preview` | Visualize layout and spatial quality |
+| 5 | `validate_scene` | Run structural validation |
+| 6 | `edit_scene` | Make targeted scene revisions |
+| 7 | `apply_animation` | Add or merge animations |
+| 8 | `optimize_for_web` | Reduce performance cost |
+| 9 | `synthesize_geometry` | Create geometry contracts |
+| 10 | `generate_r3f_code` | Produce final React Three Fiber code |
+| 11 | `export_asset` | Package outputs as files |
+| 12 | `integration_help` | Explain app integration steps |
+
+Detailed tool reference:
+
+- [tool_information.md](./tool_information.md)
+
+## Examples
+
+Worked example:
+
+- [quick_example.md](./quick_example.md)
+
+Prompt examples for users:
+
+- [sample_prompt.md](./sample_prompt.md)
+
+## Folder Structure
+
+Repository structure reference:
+
+- [folder_structure.md](./folder_structure.md)
+
+## Installation
+
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Commands
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Build the server:
+
+```bash
+npm run build
+```
+
+Start the local `stdio` server:
+
+```bash
+npm run start
+```
+
+Run development mode with file watching:
 
 ```bash
 npm run dev
 ```
 
-Run the MCP server over HTTP for browser-based tools:
+Run development mode over HTTP stream:
 
 ```bash
 npm run dev:http
 ```
 
-The HTTP transport listens on `http://localhost:8080/mcp` by default.
+Run the project health checks:
 
-## Preview Tool
-
-Call `preview` after `generate_scene` and before `synthesize_geometry`. It gives the LLM a quick validation step before committing to geometry synthesis and R3F code generation.
-
-The tool returns:
-
-- An inline SVG wireframe showing object placement, lights, the camera frustum, and pending-synthesis markers.
-- A structured text description with scene overview, object list, lighting summary, animation summary, and spatial validation results.
-
-The `confidence_score` is a 0-10 summary of the six automated validation checks:
-
-- Higher scores mean the scene is positioned and connected well enough to move forward.
-- Scores below `7` should be treated as a stop signal to fix layout, lighting, or animation-target issues before calling `generate_r3f_code`.
-
-How to read validation results:
-
-- `PASS` means the check is healthy and does not need intervention.
-- `WARN` means the scene is still previewable, but there is a spatial or pipeline issue worth fixing.
-- `FAIL` means the preview found a broken reference or a blocking issue that should be corrected before proceeding.
-
-Recommended pipeline:
-
-```text
-refine_prompt
-  -> generate_scene_plan
-    -> generate_scene
-      -> preview
-        -> if READY: synthesize_geometry -> generate_r3f_code
-        -> if WARN/FAIL: edit_scene -> preview again
+```bash
+npm run health
 ```
 
-## validate_scene
+### Claude Desktop Configuration
 
-### When to call it
+Point Claude Desktop at the built `dist/server.js` file.
 
-Call `validate_scene` after `generate_scene` and before `synthesize_geometry`. It acts as a defensive gate that catches malformed scene data, broken animation targets, out-of-bounds objects, and unresolved synthesis contracts before code generation.
+`~/Library/Application Support/Claude/claude_desktop_config.json`
 
-### What it checks
+```json
+{
+  "mcpServers": {
+    "3dflow": {
+      "command": "node",
+      "args": [
+        "/Users/alex/dev/3dflow-mcp-server/dist/server.js"
+      ]
+    }
+  }
+}
+```
 
-| Rule ID | Category | Severity | Description |
+### Cursor and Other `stdio` Clients
+
+Use the same `command` and `args` pattern:
+
+```json
+{
+  "mcpServers": {
+    "3dflow": {
+      "command": "node",
+      "args": [
+        "/Users/alex/dev/3dflow-mcp-server/dist/server.js"
+      ]
+    }
+  }
+}
+```
+
+## Deployment
+
+This project is self-hosted. No public hosted URL is bundled with the repository.
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| S1 | Structure | error | `scene_id` exists and is non-empty |
-| S2 | Structure | error | `objects` array exists and contains at least one object |
-| S3 | Structure | error | camera position is a valid `[x, y, z]` number array |
-| S4 | Structure | warn | camera Z is not too close to the scene |
-| O1 | Objects | error | every object has a usable string `id` |
-| O2 | Objects | error | every object has a valid finite position vector |
-| O3 | Objects | warn | objects stay within recommended camera-frustum bounds |
-| O4 | Objects | warn | objects do not overlap at nearly identical XZ positions |
-| O5 | Objects | warn | no unresolved `SYNTHESIS_REQUIRED` contracts remain |
-| L1 | Lighting | warn | at least one non-ambient light is present |
-| L2 | Lighting | warn | light intensity values stay in a sane range |
-| A1 | Animation | error | every `target_id` resolves to a real object id |
-| A2 | Animation | warn | animation configs include the required fields per type |
+| `MCP_TRANSPORT` | Yes for remote mode | `stdio` | Set to `http` to enable HTTP stream transport |
+| `PORT` | No | `8080` | Port used when `MCP_TRANSPORT=http` |
+| `NODE_ENV` | No | unset | Set to `production` for hosted deployments |
 
-### Reading the output
+### Remote Commands
 
-- `is_valid` is `false` when any error-level rule fails.
-- `summary` shows how many rules passed, warned, or failed as errors.
-- `errors_detail` is the required-fix list for blocked scenes.
-- `next_step` tells the orchestrator whether to stop, review warnings, or continue into synthesis/codegen.
+Install and build:
 
-### Strict mode
+```bash
+npm install
+npm run build
+```
 
-Use `strict: true` when you want warning-level issues to block progress too. This is useful for CI checks, production exports, or workflows where even layout/lighting warnings should be fixed before generating code.
+Start the HTTP deployment:
 
-### Fix → Re-validate loop
+```bash
+MCP_TRANSPORT=http PORT=8080 node dist/server.js
+```
+
+MCP endpoint:
 
 ```text
-generate_scene
-  -> validate_scene
-    -> if BLOCKED: edit_scene
-      -> validate_scene
-        -> synthesize_geometry
-          -> generate_r3f_code
+http://localhost:8080/mcp
 ```
+
+### Remote Client Configuration
+
+```json
+{
+  "mcpServers": {
+    "3dflow-remote": {
+      "url": "https://your-deployment.up.railway.app/mcp"
+    }
+  }
+}
+```
+
+## Framework Support
+
+| Framework | `framework` param | Notes |
+| --- | --- | --- |
+| Plain React | `"plain"` | No directive added |
+| Vite | `"vite"` | No directive added |
+| Next.js App Router | `"nextjs"` | Adds `"use client"` |
+| Next.js Pages Router | `"nextjs"` | Pair with `integration_help` and `dynamic(..., { ssr: false })` |
+
+## TypeScript Support
+
+| `typing` param | Output |
+| --- | --- |
+| `"none"` | Plain `.jsx` |
+| `"typescript"` | `.tsx` with `Group \| Mesh` ref types |
+| `"prop-types"` | `.jsx` with a PropTypes block |
+
+## Operational Notes
+
+### Geometry Cache
+
+- Synthesized JSX can be cached locally under `.synthesis_cache/geometry_cache.json`.
+- The cache is created on demand.
+- Repeated object and style combinations can reuse earlier geometry.
+
+### Status Values
+
+| Status | Meaning |
+| --- | --- |
+| `SUCCESS` | Scene code generated with no placeholder fallbacks |
+| `PARTIAL_SUCCESS` | Scene code generated, but one or more objects fell back to placeholders |
+| `SYNTHESIS_REQUIRED` | More geometry synthesis work is required before final code generation |
+| `ERROR` | Generation failed and did not produce a usable component |
+
+## Author
+
+Dev Agrawal
+
+## License
+
+See [LICENSE](./LICENSE).
