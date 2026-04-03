@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { FastMCP } from "fastmcp";
 import { registerTools } from "./tools/index.js";
+import process from "node:process";
 
 const server = new FastMCP({
   name: "3d-scene-mcp",
@@ -22,7 +23,7 @@ if (transport === "http") {
     }
   });
 
-  console.log(`3D Flow MCP server running over HTTP on http://localhost:${port}/mcp`);
+  console.log(`Web3D MCP server running over HTTP on http://localhost:${port}/mcp`);
 } else {
   server.start({
     transportType: "stdio"
