@@ -19,11 +19,12 @@ if (transport === "http") {
   server.start({
     transportType: "httpStream",
     httpStream: {
-      port
+      port,
+      host: "0.0.0.0"
     }
   });
 
-  console.log(`Web3D MCP server running over HTTP on http://localhost:${port}/mcp`);
+  console.log(`Web3D MCP server running over HTTP on port ${port}`);
 } else {
   server.start({
     transportType: "stdio"
