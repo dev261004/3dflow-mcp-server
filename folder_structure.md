@@ -5,7 +5,7 @@ This file shows the main repository layout and what each area is used for.
 ## Repository Overview
 
 ```text
-3dflow-mcp-server/
+web3d-mcp-server/
 ├── README.md
 ├── quick_example.md
 ├── sample_prompt.md

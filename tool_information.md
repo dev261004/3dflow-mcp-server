@@ -1,6 +1,6 @@
 # Tool Information
 
-This file contains the detailed reference for all 12 registered tools in `3dflow-mcp-server`.
+This file contains the detailed reference for all 12 registered tools in `web3d-mcp-server`.
 
 ## Tool Index
 

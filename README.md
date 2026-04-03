@@ -1,11 +1,11 @@
-# 3dflow-mcp-server
+# web3d-mcp-server
 
 ![MCP](https://img.shields.io/badge/MCP-Compatible-1f6feb) ![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933) ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Server%20Code-3178C6?logo=typescript&logoColor=white) ![FastMCP](https://img.shields.io/badge/FastMCP-MCP%20Runtime-111827) ![Zod](https://img.shields.io/badge/Zod-Validation-3E67B1)
 
-Generate production-ready 3D scenes and React Three Fiber components from natural language directly inside your AI assistant.
+MCP server for 3D scene generation for web and ads. it's built 3d scene using react-three-fiber(R3F).
 
-`3dflow-mcp-server` turns a plain-English prompt into a structured scene plan, validated `scene_data`, geometry synthesis contracts, framework-ready `.jsx` or `.tsx` React Three Fiber code, exportable assets, and integration guidance.
+`web3d-mcp-server` turns a plain-English prompt into a structured scene plan, validated `scene_data`, geometry synthesis contracts, framework-ready `.jsx` or `.tsx` React Three Fiber code, exportable assets, and integration guidance.
 
 ## Quick Navigation
 
@@ -196,10 +196,10 @@ Point Claude Desktop at the built `dist/server.js` file.
 ```json
 {
   "mcpServers": {
-    "3dflow": {
+    "web3d": {
       "command": "node",
       "args": [
-        "/Users/alex/dev/3dflow-mcp-server/dist/server.js"
+        "/Users/alex/dev/web3d-mcp-server/dist/server.js"
       ]
     }
   }
@@ -213,10 +213,10 @@ Use the same `command` and `args` pattern:
 ```json
 {
   "mcpServers": {
-    "3dflow": {
+    "web3d": {
       "command": "node",
       "args": [
-        "/Users/alex/dev/3dflow-mcp-server/dist/server.js"
+        "/Users/alex/dev/web3d-mcp-server/dist/server.js"
       ]
     }
   }
@@ -261,7 +261,7 @@ http://localhost:8080/mcp
 ```json
 {
   "mcpServers": {
-    "3dflow-remote": {
+    "web3d-remote": {
       "url": "https://your-deployment.up.railway.app/mcp"
     }
   }

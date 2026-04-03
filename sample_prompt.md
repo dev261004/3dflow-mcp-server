@@ -1,17 +1,17 @@
-# Sample Prompts for 3dflow MCP Server
+# Sample Prompts for web3d MCP Server
 
 These prompts are written for end users working through an MCP-enabled assistant. They are designed to help the assistant call the tools in the right order and explain what it is doing.
 
 ## How to Use These
 
 - Paste one prompt into your MCP client.
-- Let the assistant use the `3dflow-mcp-server` tools step by step.
+- Let the assistant use the `web3d-mcp-server` tools step by step.
 - Ask follow-up questions with `edit_scene`, `apply_animation`, `optimize_for_web`, `export_asset`, or `integration_help` style intents when you want changes.
 
 ## 1. First-Time End-to-End Prompt
 
 ```text
-Use the 3dflow MCP server to create a premium 3D hero scene for a chrome wristwatch advertisement.
+Use the web3d MCP server to create a premium 3D hero scene for a chrome wristwatch advertisement.
 
 Please follow this pipeline:
 1. refine the prompt if needed
@@ -40,7 +40,7 @@ Show me the important outputs at each step, not just the final code.
 ```text
 Create a futuristic 3D landing page scene for a floating smartphone and payment card.
 
-Use the 3dflow MCP server and keep the object count within the server's preferred limits.
+Use the web3d MCP server and keep the object count within the server's preferred limits.
 I want:
 - style: futuristic
 - use case: website
@@ -55,7 +55,7 @@ Return Vite-compatible JSX output at the end.
 ## 3. Product Showcase Prompt
 
 ```text
-Use the 3dflow tools to build a minimal product showcase scene for a sneaker.
+Use the web3d tools to build a minimal product showcase scene for a sneaker.
 
 Requirements:
 - minimal style
@@ -71,7 +71,7 @@ I want the assistant to stop and summarize the preview and validation results be
 ## 4. Preview and Fix Prompt
 
 ```text
-Take the latest scene_data from the 3dflow workflow, run preview and validate_scene, and fix anything that blocks generate_r3f_code.
+Take the latest scene_data from the web3d workflow, run preview and validate_scene, and fix anything that blocks generate_r3f_code.
 
 If the scene is invalid:
 - use edit_scene
